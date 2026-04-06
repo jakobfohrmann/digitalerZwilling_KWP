@@ -1,0 +1,68 @@
+[
+    {
+        "id": "4c8b8da4-7687-4e07-9c07-19a5c5b673c1",
+        "name": "Mehrfamilienhaus, Altbau",
+        "density": 80.0,
+        "cycle": "1982",
+        "depth": "custom",
+        "building_types": [
+            "MFH"
+        ],
+        "baujahr_from": 1900,
+        "baujahr_to": 1930,
+        "custom_parts": [
+            "dach",
+            "fenster",
+            "tuer"
+        ]
+    },
+    {
+        "id": "9fac2cb0-ce74-4c94-9b77-34769dda1c91",
+        "name": "vollständige Sanierung alle Gebäudetypen",
+        "density": 100.0,
+        "cycle": "2009",
+        "depth": "vollsaniert",
+        "building_types": [
+            "MFH"
+        ],
+        "baujahr_from": 1900,
+        "baujahr_to": 1980,
+        "custom_parts": [
+            "dach",
+            "fenster",
+            "tuer"
+        ]
+    },
+    {
+        "id": "1c8373c6-3b08-442a-a9c8-4caa84bb4152",
+        "name": "Keine Sanierung",
+        "density": 0.0,
+        "cycle": "2009",
+        "depth": "vollsaniert",
+        "building_types": [],
+        "baujahr_from": 1900,
+        "baujahr_to": 1980,
+        "custom_parts": [
+            "dach",
+            "fenster",
+            "tuer"
+        ]
+    },
+    {
+        "id": "9067841c-8afc-4b78-b121-d98afee832a6",
+        "name": "vollständige Sanierung alle Gebäudetypen",
+        "density": 100.0,
+        "cycle": "2009",
+        "depth": "vollsaniert",
+        "building_types": [
+            "MFH"
+        ],
+        "baujahr_from": 1900,
+        "baujahr_to": 2020,
+        "custom_parts": [
+            "dach",
+            "fenster",
+            "tuer"
+        ]
+    }
+]

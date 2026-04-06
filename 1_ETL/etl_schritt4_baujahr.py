@@ -111,7 +111,7 @@ _BAUJAHR_LEGACY_ORDER: tuple[str, ...] = (
     "a2011bis2019",
     "a2020undspaeter",
 )
-_BAUJAHR_LEGACY_MITTEL: dict[str, float] = {
+_BAUJAHR_LEGACY_MITTEL: dict[str, int] = {
     "Vor1919": 1900,
     "a1919bis1948": 1933,
     "a1949bis1978": 1963,
@@ -135,23 +135,24 @@ _BAUJAHR_DESTATIS100M_ORDER: tuple[str, ...] = (
     "a2010bis2015",
     "a2016undspaeter",
 )
-_BAUJAHR_DESTATIS100M_MITTEL: dict[str, float] = {
-    "Vor1919": 1900.0,
-    "a1919bis1949": (1919 + 1949) / 2,
-    "a1950bis1959": (1950 + 1959) / 2,
-    "a1960bis1969": (1960 + 1969) / 2,
-    "a1970bis1979": (1970 + 1979) / 2,
-    "a1980bis1989": (1980 + 1989) / 2,
-    "a1990bis1999": (1990 + 1999) / 2,
-    "a2000bis2009": (2000 + 2009) / 2,
-    "a2010bis2015": (2010 + 2015) / 2,
-    "a2016undspaeter": 2020.0,
+# Repräsentatives Baujahr je Zensus-Klasse (ganze Jahre; Mittel der Spanne gerundet)
+_BAUJAHR_DESTATIS100M_MITTEL: dict[str, int] = {
+    "Vor1919": 1900,
+    "a1919bis1949": 1934,
+    "a1950bis1959": 1955,
+    "a1960bis1969": 1965,
+    "a1970bis1979": 1975,
+    "a1980bis1989": 1985,
+    "a1990bis1999": 1995,
+    "a2000bis2009": 2005,
+    "a2010bis2015": 2013,
+    "a2016undspaeter": 2020,
 }
 
 
 def _detect_baujahr_klassen_schema(
     columns: pd.Index,
-) -> tuple[list[str], dict[str, float], str] | None:
+) -> tuple[list[str], dict[str, int], str] | None:
     """
     Erkennt bekanntes Spalten-Schema für Baualters-Häufigkeiten.
     Returns (Spaltenliste in fester Reihenfolge, Mittelwerte je Klasse, Kurzname) oder None.
@@ -474,6 +475,10 @@ def create_baujahr(
             f"{missing_count} Gebäude ohne Baujahr (unverändert leer)",
             file=sys.stderr,
         )
+
+    # Ganzzahlige Baujahre (ältere Läufe: .5 aus Zensus-Mittel der Spanne)
+    bj = pd.to_numeric(gdf["baujahr"], errors="coerce")
+    gdf["baujahr"] = bj.round()
 
     print("baujahr / denkmalschutz fertig", file=sys.stderr)
     return gdf

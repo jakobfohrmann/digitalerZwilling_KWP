@@ -1,0 +1,44 @@
+[
+    {
+        "id": "5a497589-aad2-46d0-9dd3-5b3251dd4282",
+        "name": "Klima RCP45 2043",
+        "scenario": "rcp45",
+        "year": 2043
+    },
+    {
+        "id": "ec60358c-fe17-474b-b506-11708cf5b54a",
+        "name": "Klima RCP45 2038",
+        "scenario": "rcp45",
+        "year": 2038
+    },
+    {
+        "id": "b5843ae8-9256-4ef6-b395-8d01f9e0d2f4",
+        "name": "Klima RCP45 2046",
+        "scenario": "rcp45",
+        "year": 2046
+    },
+    {
+        "id": "0394935d-6d0b-4ff4-a3c1-19e0d039e8aa",
+        "name": "Klima RCP45 2030",
+        "scenario": "rcp45",
+        "year": 2030
+    },
+    {
+        "id": "09d8088e-462a-4518-b535-a00be6364cc0",
+        "name": "Klima RCP45 2043",
+        "scenario": "rcp45",
+        "year": 2043
+    },
+    {
+        "id": "a833bf17-12ae-4432-99ff-2528b1285ea6",
+        "name": "Klima RCP45 2039",
+        "scenario": "rcp45",
+        "year": 2039
+    },
+    {
+        "id": "5ddf224a-c5fe-4552-b008-dd8625b2cb6c",
+        "name": "Klima RCP26 2047",
+        "scenario": "rcp26",
+        "year": 2047
+    }
+]

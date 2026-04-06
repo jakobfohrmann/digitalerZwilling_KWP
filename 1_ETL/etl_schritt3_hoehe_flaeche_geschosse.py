@@ -8,7 +8,9 @@ Annahmen (vereinfachtes Satteldach-Modell, EPSG:25833 = Meter):
 - Kürzere Seite des minimum rotated bounding rectangle = Traufbreite; First parallel zur längeren Seite.
   Dachhöhe (First über Traufe) = (Traufbreite/2) * tan(α).
 - trauf_hoehe_m = measuredHeight_m - dach_hoehe_m.
-- Flachdach: roofType / Stichwort „flach“ oder Neigung < 0,5° → dach_hoehe_m = 0, trauf_hoehe_m = Höhe.
+- Klassifikation **zuerst** über numerischen ``lod1_roofType``-Code (wenn parsebar): 1000 = Flachdach → dach_hoehe_m = 0, trauf_hoehe_m = Höhe (Neigung wird ignoriert).
+- Anderer bekannter Code (≠ 1000) → geneigtes Dachmodell aus Neigung + MBR (der Code hat Vorrang vor Neigungs-Heuristik).
+- Ohne parsebaren ``lod1_roofType``-Code: nur noch Neigung < 0,5° als Flachdach-Näherung → dach_hoehe_m = 0, trauf_hoehe_m = Höhe; sonst Satteldach-Formel.
 - geschoss_hoehe_m (grobe Annahme): ganzzahliger Anteil von trauf_hoehe_m / 3 (// 3, in Meter) — Kennzahl für ``bezugsflaeche``.
 - anzahl_geschosse — geschätzte **Anzahl oberirdischer Geschosse** aus ``trauf_hoehe_m`` (Annahme ~3 m Geschosshöhe: ``round(trauf/3)``, mindestens 1 bei trauf > 0); für **ETL-Schritt 5** (Gebäudetyp).
 - bezugsflaeche = **georeferenzierte Fußabdruckfläche** (größtes Polygon, m²) × **geschoss_hoehe_m** (m³).
@@ -41,6 +43,11 @@ COL_RT = "lod1_roofType"
 COL_DN = "lod1_Dachneigung"
 COL_BEZUGS = "bezugsflaeche"
 COL_ANZAHL_GESCHOSSE = "anzahl_geschosse"
+# AdV/ALKIS u. ä.: 1000 = Flachdach (vgl. lod1_roofType)
+ROOFTYPE_FLACHDACH = 1000
+# Dachhöhen-Plausibilisierung
+MAX_DACHHOEHE_M = 10.0
+MAX_DACHANTEIL = 1.0 / 3.0
 # Schätzung der Geschosszahl aus Traufhöhe (konsistent mit //3 bei geschoss_hoehe_m)
 GESCHOSS_HOEHE_ANNAHME_M = 3.0
 
@@ -96,13 +103,30 @@ def _parse_float_maybe(val) -> float | None:
         return None
 
 
-def _is_flat_roof(roof_type: str | None, alpha_deg: float | None) -> bool:
-    if alpha_deg is not None and alpha_deg < 0.5:
-        return True
-    if not roof_type:
-        return False
-    r = str(roof_type).lower()
-    return any(k in r for k in ("flach", "flat", "flachdach"))
+def _parse_roof_type_code(rt) -> int | None:
+    """Numerischen Dachform-Code aus lod1_roofType; bei reinem Text ohne führende Zahl None."""
+    if rt is None or (isinstance(rt, float) and pd.isna(rt)):
+        return None
+    if isinstance(rt, bool):
+        return None
+    if isinstance(rt, (int, float)):
+        try:
+            return int(rt)
+        except (ValueError, OverflowError):
+            return None
+    t = str(rt).strip()
+    m = re.match(r"^[-+]?\d+", t)
+    if not m:
+        return None
+    try:
+        return int(m.group())
+    except ValueError:
+        return None
+
+
+def _flat_roof_fallback_no_code(alpha_deg: float | None) -> bool:
+    """Nur wenn kein numerischer roofType-Code: sehr kleine Neigung wie praktisch flach."""
+    return alpha_deg is not None and alpha_deg < 0.5
 
 
 def _largest_polygon(geom: BaseGeometry) -> BaseGeometry:
@@ -110,7 +134,7 @@ def _largest_polygon(geom: BaseGeometry) -> BaseGeometry:
         return geom
     if geom.geom_type == "MultiPolygon":
         return max(geom.geoms, key=lambda g: g.area)
-    return geoms
+    return geom
 
 
 def _mbr_short_side_m(geom: BaseGeometry) -> float:
@@ -133,29 +157,61 @@ def _mbr_short_side_m(geom: BaseGeometry) -> float:
     return min(dists) if dists else float("nan")
 
 
-def _row_dach_trauf(geom: BaseGeometry, h_m: float | None, rt, dn_raw) -> tuple[float | None, float | None]:
-    """Rückgabe (dach_hoehe_m, trauf_hoehe_m)."""
-    alpha = _parse_float_maybe(dn_raw)
-    rt_str = None if rt is None or (isinstance(rt, float) and pd.isna(rt)) else str(rt)
-    flat = _is_flat_roof(rt_str, alpha)
-
-    if h_m is None or (isinstance(h_m, float) and math.isnan(h_m)):
-        return None, None
-
-    if flat:
-        return 0.0, float(h_m)
-
-    if alpha is None:
-        return None, None
-
+def _pitched_dach_trauf(
+    geom: BaseGeometry, h_m: float, alpha_deg: float
+) -> tuple[float | None, float | None]:
+    """Satteldach-Näherung: Dachhöhe aus Traufbreite (MBR) und Neigungswinkel."""
     W = _mbr_short_side_m(geom)
     if W is None or (isinstance(W, float) and (math.isnan(W) or W <= 0)):
         return None, None
-
-    rad = math.radians(alpha)
+    rad = math.radians(alpha_deg)
     dach = (W / 2.0) * math.tan(rad)
     trauf = float(h_m) - dach
     return dach, trauf
+
+
+def _is_null_roof_type(rt) -> bool:
+    return rt is None or pd.isna(rt)
+
+
+def _apply_dach_plausibility(
+    dach: float | None, trauf: float | None, gesamt_hoehe: float
+) -> tuple[float | None, float | None]:
+    if dach is None or (isinstance(dach, float) and math.isnan(dach)):
+        return dach, trauf
+    if dach > MAX_DACHHOEHE_M or dach > (gesamt_hoehe * MAX_DACHANTEIL):
+        return 0.0, float(gesamt_hoehe)
+    return dach, trauf
+
+
+def _row_dach_trauf(geom: BaseGeometry, h_m: float | None, rt, dn_raw) -> tuple[float | None, float | None]:
+    """Rückgabe (dach_hoehe_m, trauf_hoehe_m). Zuerst lod1_roofType-Code, sonst Heuristik."""
+    if h_m is None or (isinstance(h_m, float) and math.isnan(h_m)):
+        return None, None
+
+    hf = float(h_m)
+    if _is_null_roof_type(rt):
+        return 0.0, hf
+
+    code = _parse_roof_type_code(rt)
+    if code == ROOFTYPE_FLACHDACH:
+        return 0.0, hf
+
+    alpha = _parse_float_maybe(dn_raw)
+
+    if code is not None:
+        if alpha is None:
+            return None, None
+        dach, trauf = _pitched_dach_trauf(geom, hf, alpha)
+        return _apply_dach_plausibility(dach, trauf, hf)
+
+    if _flat_roof_fallback_no_code(alpha):
+        return 0.0, hf
+
+    if alpha is None:
+        return None, None
+    dach, trauf = _pitched_dach_trauf(geom, hf, alpha)
+    return _apply_dach_plausibility(dach, trauf, hf)
 
 
 def _pick_layer(gpkg_path: str, layer: str | None) -> str | None:

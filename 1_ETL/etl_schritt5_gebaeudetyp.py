@@ -12,7 +12,8 @@ Die Höhen-Regeln (MFH/GMH/HH) verwenden ``trauf_hoehe_m + dach_hoehe_m`` als Ob
 EFH/RH: Fußabdruckfläche (m²) und ``anzahl_geschosse``.
 
 Eingabe: Standard erste ``*_schritt4.gpkg`` unter ``output/output_step4/``
-Ausgabe: ``output/output_step5/<Basis>_schritt5.gpkg``
+Ausgabe: ``output/output_step5/<Basis>_schritt5.gpkg`` sowie dieselbe Datei unter
+``../2_COMPUTE/computing_inputs/`` (Eingabe für die Berechnung).
 
 Beispiele:
   python etl_schritt5_gebaeudetyp.py
@@ -24,6 +25,7 @@ from __future__ import annotations
 import argparse
 import glob
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -32,14 +34,18 @@ import numpy as np
 import pandas as pd
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+COMPUTE_INPUTS_DIR = os.path.join(PROJECT_ROOT, "2_COMPUTE", "computing_inputs")
 
 # Spalten aus etl_schritt3_hoehe_flaeche_geschosse.py
 COL_TRAUF = "trauf_hoehe_m"
 COL_DACH = "dach_hoehe_m"
 COL_BEZUGS = "bezugsflaeche"
 COL_ANZAHL_GESCHOSSE = "anzahl_geschosse"
+COL_OBJ_HOEHE = "lod1_measuredHeight_m"
 
 EFH_MAX_FOOTPRINT_M2 = 400.0
+MFH_MAX_BEZUGSFLAECHE_M2 = 2000.0
 
 
 def _ensure_parent_dir(path: str) -> None:
@@ -73,6 +79,11 @@ def _default_output_path(input_path: str) -> str:
     stem = Path(input_path).stem
     base = _base_stem_from_step4(stem)
     return os.path.join(SCRIPT_DIR, "output", "output_step5", f"{base}_schritt5.gpkg")
+
+
+def _compute_inputs_copy_path(out_path: str) -> str:
+    """Gleicher Dateiname wie Schritt-5-Ausgabe, unter 2_COMPUTE/computing_inputs/."""
+    return os.path.join(COMPUTE_INPUTS_DIR, os.path.basename(out_path))
 
 
 def _pick_layer(gpkg_path: str, layer: str | None) -> str | None:
@@ -138,14 +149,11 @@ def determine_gebaeudetyp(row, gdf: gpd.GeoDataFrame, idx) -> float | str:
     anzahl_oberirdische_geschosse = _float_or_nan(row.get(COL_ANZAHL_GESCHOSSE))
     trauf_m = _float_or_nan(row.get(COL_TRAUF))
     dach_m = _float_or_nan(row.get(COL_DACH))
+    objekthoehe_m = _float_or_nan(row.get(COL_OBJ_HOEHE))
+    bezugsflaeche_m2 = _float_or_nan(row.get(COL_BEZUGS))
 
     if pd.isna(trauf_m) or pd.isna(anzahl_oberirdische_geschosse):
         return np.nan
-
-    if pd.notna(dach_m):
-        objekthoehe_m = trauf_m + dach_m
-    else:
-        objekthoehe_m = trauf_m
 
     footprint_m2 = _footprint_area_m2(row.geometry)
 
@@ -159,16 +167,17 @@ def determine_gebaeudetyp(row, gdf: gpd.GeoDataFrame, idx) -> float | str:
             return "RH"
         return "EFH"
 
-    if (objekthoehe_m <= 13) or (2 < anzahl_oberirdische_geschosse <= 4):
-        return "MFH"
-
-    if (13 < objekthoehe_m < 22) and (anzahl_oberirdische_geschosse > 4):
-        return "GMH"
-
-    if objekthoehe_m >= 22:
+    elif (bezugsflaeche_m2 > MFH_MAX_BEZUGSFLAECHE_M2) and (objekthoehe_m >= 22):
         return "HH"
 
-    return "fällt nicht in eine der Kategorien"
+    elif (bezugsflaeche_m2 > MFH_MAX_BEZUGSFLAECHE_M2):
+        return "GMH"
+    
+    elif (bezugsflaeche_m2 <= MFH_MAX_BEZUGSFLAECHE_M2) :  
+        return "MFH"
+
+    else:
+        return "fällt nicht in eine der Kategorien"
 
 
 def create_gebaeudetyp(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
@@ -245,10 +254,21 @@ def main() -> int:
     _ensure_parent_dir(out_path)
     gdf.to_file(out_path, driver="GPKG", layer=layer_out)
 
+    copy_path = _compute_inputs_copy_path(out_path)
+    out_abs = os.path.abspath(out_path)
+    copy_abs = os.path.abspath(copy_path)
+    if os.path.normcase(out_abs) != os.path.normcase(copy_abs):
+        _ensure_parent_dir(copy_path)
+        shutil.copy2(out_path, copy_path)
+
     print(
         f"Gebäudetyp: {len(gdf)} Gebäude | {out_path} (Layer: {layer_out})",
         file=sys.stderr,
     )
+    if os.path.normcase(out_abs) != os.path.normcase(copy_abs):
+        print(f"Kopie für Compute: {copy_path}", file=sys.stderr)
+    else:
+        print(f"Bereits unter Compute-Inputs: {copy_path}", file=sys.stderr)
     return 0
 
 

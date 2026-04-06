@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gebäude Visualisierung - Leipzig</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        /* Sidebar */
+        #sidebar {
+            width: 350px;
+            background: #faf8f3; /* Helles Creme-Weiß */
+            color: #2c3e50;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #1e3a5f; /* Dunkles Blau */
+        }
+        
+        h2 {
+            font-size: 18px;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #3498db; /* Mittleres Blau */
+            padding-bottom: 5px;
+            color: #2c5f8f; /* Mittel-dunkles Blau */
+        }
+        
+        /* Stats Display */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .stat-box {
+            background: #e8f4f8; /* Sehr helles Blau */
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #b8d4e3; /* Helles Blau für Border */
+        }
+        
+        .stat-label {
+            font-size: 11px;
+            color: #5a8fb8; /* Mittleres Blau */
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1e6fa8; /* Kräftiges Blau */
+        }
+        
+        .stat-value.large {
+            font-size: 14px;
+        }
+        
+        /* Map Container */
+        #map {
+            flex: 1;
+            height: 100vh;
+        }
+        
+        /* Loading Overlay */
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(44, 62, 80, 0.95);
+            padding: 30px 50px;
+            border-radius: 10px;
+            color: white;
+            font-size: 18px;
+            z-index: 10000;
+            display: none;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        /* Legend */
+        .legend {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            font-size: 12px;
+            line-height: 1.8;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            margin-top: 2px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+        
+        .legend-item > span:not(.legend-color) {
+            flex: 1;
+        }
+        
+        /* Layer-Selection Styling */
+        #layer-selection label:hover {
+            background: #d4e8f0 !important; /* Helles Blau beim Hover */
+        }
+        
+        #layer-selection label {
+            display: block;
+            padding: 10px;
+            margin-bottom: 5px;
+            background: #e8f4f8; /* Sehr helles Blau */
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border: 1px solid #b8d4e3; /* Helles Blau für Border */
+            color: #2c5f8f; /* Mittel-dunkles Blau für Text */
+        }
+        
+        #layer-selection label input[type="radio"]:checked + span {
+            font-weight: 600;
+            color: #1e6fa8; /* Kräftiges Blau */
+        }
+        
+        /* Scrollbar styling */
+        #sidebar::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        #sidebar::-webkit-scrollbar-track {
+            background: #f0f0f0;
+        }
+        
+        #sidebar::-webkit-scrollbar-thumb {
+            background: #5a8fb8; /* Mittleres Blau */
+            border-radius: 4px;
+        }
+        
+        #sidebar::-webkit-scrollbar-thumb:hover {
+            background: #1e6fa8; /* Kräftiges Blau beim Hover */
+        }
+        
+        /* Popup styling */
+        .popup-content {
+            font-family: 'Segoe UI', sans-serif;
+            min-width: 250px;
+        }
+        
+        .popup-content h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+            font-size: 16px;
+        }
+        
+        .popup-content table {
+            width: 100%;
+            font-size: 13px;
+            border-collapse: collapse;
+        }
+        
+        .popup-content td {
+            padding: 4px 8px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        .popup-content td:first-child {
+            font-weight: 600;
+            color: #34495e;
+            width: 50%;
+        }
+        
+        .popup-content tr:last-child td {
+            border-bottom: none;
+        }
+        
+        /* Legend positioning - fixed in bottom right corner */
+        #legend-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            max-width: 280px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 1000;
+            font-size: 13px;
+        }
+        
+        #legend-container h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        #legend-container p {
+            font-size: 11px;
+            color: #7f8c8d;
+            margin-bottom: 10px;
+        }
+        
+        /* Scrollbar für Legende */
+        #legend-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        #legend-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        
+        #legend-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+        
+        #legend-container::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #1e6fa8;
+        }
+        
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+        
+        .parameter-edit-button {
+            width: 100%;
+            padding: 12px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background 0.2s;
+        }
+        
+        .parameter-edit-button:hover {
+            background: #1e6fa8;
+        }
+
+        /* Sanierung-Formular */
+        .sanierung-group {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #b8d4e3;
+            margin-bottom: 10px;
+        }
+
+        .sanierung-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .sanierung-input,
+        .sanierung-select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 12px;
+            background: white;
+        }
+
+        .sanierung-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .sanierung-checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .sanierung-checkbox-group label {
+            font-size: 12px;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div id="sidebar">
+        <h1>Heizwärmebedarf im Pilotgebiet Mockau</h1>
+        <p style="font-size: 14px; color: #5a8fb8; margin-bottom: 20px;">
+            Approximative Darstellung mithilfe von Gebäudetypologie
+        </p>
+        
+        <h2>Layer-Auswahl</h2>
+        <div id="layer-selection" style="margin-bottom: 20px;">
+            <label>
+                <input type="radio" name="layer" value="waermebedarf" style="margin-right: 8px;">
+                <span>Wärmebedarf [kWh/a]</span>
+            </label>
+            <label>
+                <input type="radio" name="layer" value="spez_waermebedarf" checked style="margin-right: 8px;">
+                <span>Spezifischer Wärmebedarf [kWh/m²a]</span>
+            </label>
+            <label>
+                <input type="radio" name="layer" value="gebaeudetyp" style="margin-right: 8px;">
+                <span>Gebäudetyp</span>
+            </label>
+            <label>
+                <input type="radio" name="layer" value="baualtersklasse" style="margin-right: 8px;">
+                <span>Baualtersklasse</span>
+            </label>
+        </div>
+        
+        <h2>Statistik</h2>
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-label">Gebäude gesamt</div>
+                <div class="stat-value" id="stat-buildings">-</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Bezugsfläche</div>
+                <div class="stat-value large" id="stat-area">-</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Wärmebedarf (Σ)</div>
+                <div class="stat-value large" id="stat-waermebedarf">-</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Ø spez. Bedarf</div>
+                <div class="stat-value large" id="stat-spez-waermebedarf">-</div>
+            </div>
+        </div>
+
+        <h2>Sanierung</h2>
+        <div class="sanierung-group">
+            <label class="sanierung-label">Gespeicherte Annahmen</label>
+            <select id="sanierung-saved" class="sanierung-select"></select>
+        </div>
+
+        <div class="sanierung-group">
+            <label class="sanierung-label" for="sanierung-name">Name</label>
+            <input id="sanierung-name" class="sanierung-input" type="text" value="Sanierungsszenario">
+
+            <label class="sanierung-label" for="sanierung-density" style="margin-top: 10px;">Sanierungsdichte [%]</label>
+            <input id="sanierung-density" class="sanierung-input" type="number" min="0" max="100" step="1" value="80">
+
+            <label class="sanierung-label" for="sanierung-cycle" style="margin-top: 10px;">Sanierungszyklus</label>
+            <select id="sanierung-cycle" class="sanierung-select"></select>
+
+            <label class="sanierung-label" for="sanierung-depth" style="margin-top: 10px;">Sanierungstiefe</label>
+            <select id="sanierung-depth" class="sanierung-select">
+                <option value="vollsaniert" selected>Vollsaniert</option>
+                <option value="teilsaniert">Teilsaniert (Dach/Wand/Fenster)</option>
+                <option value="huelle">Gebäudehülle</option>
+                <option value="fenster">Nur Fenster</option>
+                <option value="dach">Nur Dach</option>
+                <option value="wand">Nur Wand</option>
+                <option value="keller">Nur Keller</option>
+                <option value="tuer">Nur Tür</option>
+                <option value="custom">Individuell</option>
+            </select>
+
+            <label class="sanierung-label" style="margin-top: 10px;">Gebäudeteile (für "Individuell")</label>
+            <div class="sanierung-checkbox-group" id="sanierung-parts">
+                <label><input type="checkbox" value="dach"> Dach</label>
+                <label><input type="checkbox" value="geschossdecke"> Geschossdecke</label>
+                <label><input type="checkbox" value="wand"> Wand</label>
+                <label><input type="checkbox" value="keller"> Keller</label>
+                <label><input type="checkbox" value="fenster"> Fenster</label>
+                <label><input type="checkbox" value="tuer"> Tür</label>
+            </div>
+
+            <label class="sanierung-label" style="margin-top: 10px;">Gebäudetypen</label>
+            <div class="sanierung-checkbox-group" id="sanierung-types">
+                <label><input type="checkbox" value="all" checked> Alle</label>
+                <label><input type="checkbox" value="EFH"> EFH</label>
+                <label><input type="checkbox" value="RH"> RH</label>
+                <label><input type="checkbox" value="MFH"> MFH</label>
+                <label><input type="checkbox" value="GMH"> GMH</label>
+                <label><input type="checkbox" value="HH"> HH</label>
+            </div>
+
+            <label class="sanierung-label" style="margin-top: 10px;">Baujahrbereich</label>
+            <div class="sanierung-row">
+                <input id="sanierung-baujahr-from" class="sanierung-input" type="number" placeholder="von">
+                <input id="sanierung-baujahr-to" class="sanierung-input" type="number" placeholder="bis">
+            </div>
+        </div>
+
+        <button class="parameter-edit-button" id="sanierung-simulate-btn" style="margin-top: 10px; background: #8e44ad;">
+            Sanierung simulieren
+        </button>
+
+        <h2>Klima</h2>
+        <div class="sanierung-group">
+            <label class="sanierung-label" for="klima-scenario">Klimaszenario</label>
+            <select id="klima-scenario" class="sanierung-select">
+                <option value="rcp26">RCP 2.6</option>
+                <option value="rcp45">RCP 4.5</option>
+                <option value="rcp85">RCP 8.5</option>
+            </select>
+
+            <label class="sanierung-label" for="klima-year" style="margin-top: 10px;">Jahr</label>
+            <select id="klima-year" class="sanierung-select"></select>
+        </div>
+
+        <button class="parameter-edit-button" id="klima-simulate-btn" style="margin-top: 10px; background: #16a085;">
+            Klima simulieren
+        </button>
+        
+    </div>
+    
+    <!-- Map Container -->
+    <div id="map"></div>
+    
+    <!-- Legend Container - Fixed in bottom left corner -->
+    <div id="legend-container" class="legend">
+        <p style="color: #7f8c8d; font-size: 11px; margin-bottom: 10px;">
+            Wähle einen Layer aus, um die Legende zu sehen.
+        </p>
+    </div>
+    
+    <!-- Loading Overlay -->
+    <div class="loading" id="loading">
+        Lade Daten...
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // Initialisiere Karte
+        const map = L.map('map').setView([51.340199, 12.375130], 15);
+        
+        // OSM Basiskarte
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        // Layer-Gruppen
+        const layers = {
+            waermebedarf: null,
+            spez_waermebedarf: null,
+            gebaeudetyp: null,
+            baualtersklasse: null
+        };
+        
+        let currentLayer = null;
+        
+        // Style-Funktion basierend auf Layer-Typ
+        function getStyle(feature, layerType) {
+            const color = feature.properties._layer_color || '#95a5a6';
+            return {
+                fillColor: color,
+                weight: 1,
+                opacity: 1,
+                color: '#34495e',
+                fillOpacity: 0.7
+            };
+        }
+        
+        // Popup-Funktion
+        function onEachFeature(feature, layer) {
+            const props = feature.properties;
+            
+            // Lade detaillierte Gebäudeinformationen beim Klick
+            layer.on('click', function(e) {
+                const buildingId = props.lod1_gml_id || props.identifikator || props.id || props.fid;
+                if (buildingId) {
+                    loadBuildingDetails(buildingId, e.latlng);
+                } else {
+                    showPopup(props, e.latlng);
+                }
+            });
+        }
+        
+        // Lade Gebäude-Details von API
+        function loadBuildingDetails(buildingId, latlng) {
+            fetch(`/api/building/${buildingId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Fehler:', data.error);
+                        showPopup(null, latlng);
+                    } else {
+                        showPopup(data, latlng);
+                    }
+                })
+                .catch(error => {
+                    console.error('Fehler beim Laden der Gebäudedaten:', error);
+                    showPopup(null, latlng);
+                });
+        }
+        
+        // Zeige Popup mit Gebäudeinformationen
+        function showPopup(buildingData, latlng) {
+            let content = '<div class="popup-content"><h3>Gebäude</h3><table>';
+            
+            if (buildingData) {
+                if (buildingData.baujahr !== null && buildingData.baujahr !== undefined) {
+                    content += `<tr><td><strong>Baujahr:</strong></td><td>${buildingData.baujahr}</td></tr>`;
+                }
+                if (buildingData.gebaeudetyp) {
+                    content += `<tr><td><strong>Gebäudetyp:</strong></td><td>${buildingData.gebaeudetyp}</td></tr>`;
+                }
+                if (buildingData.bezugsflaeche !== null && buildingData.bezugsflaeche !== undefined) {
+                    content += `<tr><td><strong>Bezugsfläche:</strong></td><td>${buildingData.bezugsflaeche.toFixed(0)} m²</td></tr>`;
+                }
+                if (buildingData.spez_waermebedarf !== null && buildingData.spez_waermebedarf !== undefined) {
+                    content += `<tr style="background: #ecf0f1;"><td><strong>Spez. Wärmebedarf:</strong></td><td><strong>${buildingData.spez_waermebedarf.toFixed(1)} kWh/m²a</strong></td></tr>`;
+                }
+                if (buildingData.baualtersklasse) {
+                    content += `<tr><td><strong>Baualtersklasse:</strong></td><td>${buildingData.baualtersklasse}</td></tr>`;
+                }
+            } else {
+                content += '<tr><td colspan="2">Keine Details verfügbar</td></tr>';
+            }
+            
+            content += '</table></div>';
+            
+            L.popup()
+                .setLatLng(latlng)
+                .setContent(content)
+                .openOn(map);
+        }
+        
+        // Lade Layer von API
+        function loadLayer(layerType) {
+            const loading = document.getElementById('loading');
+            loading.classList.add('active');
+            
+            fetch(`/api/layer/${layerType}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Fehler:', data.error);
+                        alert('Fehler beim Laden des Layers: ' + data.error);
+                        loading.classList.remove('active');
+                        return;
+                    }
+                    
+                    // Entferne vorherigen Layer
+                    if (currentLayer) {
+                        map.removeLayer(currentLayer);
+                    }
+                    
+                    // Erstelle neuen Layer
+                    currentLayer = L.geoJSON(data, {
+                        style: (feature) => getStyle(feature, layerType),
+                        onEachFeature: onEachFeature
+                    }).addTo(map);
+                    
+                    // Zoom zu den Gebäuden
+                    if (currentLayer.getBounds().isValid()) {
+                        map.fitBounds(currentLayer.getBounds());
+                    }
+                    
+                    // Update Legende
+                    updateLegend(layerType, data);
+                    
+                    loading.classList.remove('active');
+                })
+                .catch(error => {
+                    console.error('Fehler beim Laden des Layers:', error);
+                    alert('Fehler beim Laden des Layers: ' + error);
+                    loading.classList.remove('active');
+                });
+        }
+        
+        // Update Legende basierend auf Layer-Typ
+        function updateLegend(layerType, geojson) {
+            const legendContainer = document.getElementById('legend-container');
+            let legendHTML = '';
+            
+            if (layerType === 'waermebedarf') {
+                legendHTML = '<h4 style="margin: 0 0 10px 0; color: #2c3e50;">Wärmebedarf [kWh/a]</h4>';
+                legendHTML += '<p style="font-size: 11px; color: #7f8c8d; margin-bottom: 10px;">Absoluter jährlicher Heizwärmebedarf pro Gebäude.</p>';
+                // Lade Farben vom Backend
+                fetch('/api/legend-colors')
+                    .then(response => response.json())
+                    .then(colors => {
+                        const classes = [
+                            { key: 'sehr_niedrig', label: '< 50.000 kWh/a', desc: 'Sehr niedrig' },
+                            { key: 'niedrig', label: '50.000 - 80.000 kWh/a', desc: 'Niedrig' },
+                            { key: 'mittel', label: '80.000 - 120.000 kWh/a', desc: 'Mittel' },
+                            { key: 'mittel_hoch', label: '120.000 - 150.000 kWh/a', desc: 'Mittel-Hoch' },
+                            { key: 'hoch', label: '150.000 - 200.000 kWh/a', desc: 'Hoch' },
+                            { key: 'sehr_hoch', label: '> 200.000 kWh/a', desc: 'Sehr hoch' }
+                        ];
+                        let waermeHTML = legendHTML;
+                        classes.forEach(cls => {
+                            const color = colors.waermebedarf[cls.key].color || '#95a5a6';
+                            waermeHTML += `<div class="legend-item"><span class="legend-color" style="background: ${color};"></span><span style="color: #2c3e50;">${cls.label}</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">${cls.desc}</span></div>`;
+                        });
+                        legendContainer.innerHTML = waermeHTML;
+                    })
+                    .catch(error => {
+                        console.error('Fehler beim Laden der Farben:', error);
+                        // Fallback: Verwende Standard-Farben
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #2ecc71;"></span><span style="color: #2c3e50;">< 50.000 kWh/a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Sehr niedrig</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #52be80;"></span><span style="color: #2c3e50;">50.000 - 80.000 kWh/a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Niedrig</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #f1c40f;"></span><span style="color: #2c3e50;">80.000 - 120.000 kWh/a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Mittel</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #f39c12;"></span><span style="color: #2c3e50;">120.000 - 150.000 kWh/a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Mittel-Hoch</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #e67e22;"></span><span style="color: #2c3e50;">150.000 - 200.000 kWh/a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Hoch</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #e74c3c;"></span><span style="color: #2c3e50;">> 200.000 kWh/a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Sehr hoch</span></div>';
+                        legendContainer.innerHTML = legendHTML;
+                    });
+                return; // Wird asynchron aktualisiert
+            } else if (layerType === 'spez_waermebedarf') {
+                legendHTML = '<h4 style="margin: 0 0 10px 0; color: #2c3e50;">Spezifischer Wärmebedarf [kWh/m²a]</h4>';
+                legendHTML += '<p style="font-size: 11px; color: #7f8c8d; margin-bottom: 10px;">Heizwärmebedarf pro m² Bezugsfläche. Vergleich der Energieeffizienz unabhängig von Gebäudegröße.</p>';
+                // Lade Farben vom Backend
+                fetch('/api/legend-colors')
+                    .then(response => response.json())
+                    .then(colors => {
+                        const classes = [
+                            { key: 'sehr_niedrig', label: '< 50 kWh/m²a', desc: 'KfW-Effizienzhaus 40/55' },
+                            { key: 'niedrig', label: '50 - 80 kWh/m²a', desc: 'Gute Energieeffizienz' },
+                            { key: 'mittel', label: '80 - 120 kWh/m²a', desc: 'Durchschnittlich' },
+                            { key: 'mittel_hoch', label: '120 - 150 kWh/m²a', desc: 'Erhöhter Bedarf' },
+                            { key: 'hoch', label: '150 - 200 kWh/m²a', desc: 'Sanierungsbedarf' },
+                            { key: 'sehr_hoch', label: '> 200 kWh/m²a', desc: 'Dringender Sanierungsbedarf' }
+                        ];
+                        let spezHTML = legendHTML;
+                        classes.forEach(cls => {
+                            const color = colors.spez_waermebedarf[cls.key].color || '#95a5a6';
+                            spezHTML += `<div class="legend-item"><span class="legend-color" style="background: ${color};"></span><span style="color: #2c3e50;">${cls.label}</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">${cls.desc}</span></div>`;
+                        });
+                        legendContainer.innerHTML = spezHTML;
+                    })
+                    .catch(error => {
+                        console.error('Fehler beim Laden der Farben:', error);
+                        // Fallback: Verwende Standard-Farben
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #2ecc71;"></span><span style="color: #2c3e50;">< 50 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">KfW-Effizienzhaus 40/55</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #52be80;"></span><span style="color: #2c3e50;">50 - 80 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Gute Energieeffizienz</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #f1c40f;"></span><span style="color: #2c3e50;">80 - 120 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Durchschnittlich</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #f39c12;"></span><span style="color: #2c3e50;">120 - 150 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Erhöhter Bedarf</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #e67e22;"></span><span style="color: #2c3e50;">150 - 200 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Sanierungsbedarf</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #e74c3c;"></span><span style="color: #2c3e50;">> 200 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Dringender Sanierungsbedarf</span></div>';
+                        legendContainer.innerHTML = legendHTML;
+                    });
+                return; // Wird asynchron aktualisiert
+            } else if (layerType === 'gebaeudetyp') {
+                legendHTML = '<h4 style="margin: 0 0 10px 0; color: #2c3e50;">Gebäudetyp</h4>';
+                legendHTML += '<p style="font-size: 11px; color: #7f8c8d; margin-bottom: 10px;">Klassifizierung nach Nutzung und Struktur.</p>';
+                // Lade Farben vom Backend
+                fetch('/api/legend-colors')
+                    .then(response => response.json())
+                    .then(colors => {
+                        const typen = [
+                            { name: 'EFH', desc: 'Einfamilienhaus' },
+                            { name: 'RH', desc: 'Reihenhaus' },
+                            { name: 'MFH', desc: 'Mehrfamilienhaus' },
+                            { name: 'GMH', desc: 'Großes Mehrfamilienhaus' },
+                            { name: 'HH', desc: 'Hochhaus' }
+                        ];
+                        let typHTML = legendHTML;
+                        typen.forEach(typ => {
+                            const color = colors.gebaeudetyp[typ.name] || '#95a5a6';
+                            typHTML += `<div class="legend-item"><span class="legend-color" style="background: ${color};"></span><span style="color: #2c3e50;">${typ.name}</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">${typ.desc}</span></div>`;
+                        });
+                        legendContainer.innerHTML = typHTML;
+                    })
+                    .catch(error => {
+                        console.error('Fehler beim Laden der Farben:', error);
+                        // Fallback: Verwende Standard-Farben
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #3498db;"></span><span style="color: #2c3e50;">EFH</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Einfamilienhaus</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #9b59b6;"></span><span style="color: #2c3e50;">RH</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Reihenhaus</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #e74c3c;"></span><span style="color: #2c3e50;">MFH</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Mehrfamilienhaus</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #f39c12;"></span><span style="color: #2c3e50;">GMH</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Geschosswohnungsbau</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #1abc9c;"></span><span style="color: #2c3e50;">HH</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Hochhaus</span></div>';
+                        legendContainer.innerHTML = legendHTML;
+                    });
+                return; // Wird asynchron aktualisiert
+            } else if (layerType === 'baualtersklasse') {
+                legendHTML = '<h4 style="margin: 0 0 10px 0; color: #2c3e50;">Baualtersklasse</h4>';
+                legendHTML += '<p style="font-size: 11px; color: #7f8c8d; margin-bottom: 10px;">Einteilung nach Baujahr und geltenden Wärmeschutzverordnungen.</p>';
+                // Lade Farben vom Backend
+                fetch('/api/legend-colors')
+                    .then(response => response.json())
+                    .then(colors => {
+                        const classes = [
+                            { name: 'vor 1919', years: '< 1919', klasse: 'A/B' },
+                            { name: '1919-1948', years: '1919 - 1948', klasse: 'C' },
+                            { name: '1949-1957', years: '1949 - 1957', klasse: 'D' },
+                            { name: '1958-1968', years: '1958 - 1968', klasse: 'E' },
+                            { name: '1969-1978', years: '1969 - 1978', klasse: 'F' },
+                            { name: '1979-1983', years: '1979 - 1983', klasse: 'G' },
+                            { name: '1984-1994', years: '1984 - 1994', klasse: 'H' },
+                            { name: '1995-2001', years: '1995 - 2001', klasse: 'I' },
+                            { name: '2002-2009', years: '2002 - 2009', klasse: 'J' },
+                            { name: 'nach 2009', years: '≥ 2010', klasse: 'K' }
+                        ];
+                        classes.forEach(cls => {
+                            const color = colors.baualtersklasse[cls.name] || '#95a5a6';
+                            legendHTML += `<div class="legend-item"><span class="legend-color" style="background: ${color};"></span><span style="color: #2c3e50;">${cls.years}</span> <strong style="color: #2c3e50;">(${cls.klasse})</strong><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Baualtersklasse ${cls.klasse}</span></div>`;
+                        });
+                        legendContainer.innerHTML = legendHTML;
+                    })
+                    .catch(error => {
+                        console.error('Fehler beim Laden der Farben:', error);
+                        // Fallback: Verwende Standard-Farben
+                        const classes = [
+                            { name: 'vor 1919', years: '< 1919', klasse: 'A/B', color: '#4a2c1a' },
+                            { name: '1919-1948', years: '1919 - 1948', klasse: 'C', color: '#6b4423' },
+                            { name: '1949-1957', years: '1949 - 1957', klasse: 'D', color: '#8b5a3c' },
+                            { name: '1958-1968', years: '1958 - 1968', klasse: 'E', color: '#a87055' },
+                            { name: '1969-1978', years: '1969 - 1978', klasse: 'F', color: '#c5866e' },
+                            { name: '1979-1983', years: '1979 - 1983', klasse: 'G', color: '#d4a087' },
+                            { name: '1984-1994', years: '1984 - 1994', klasse: 'H', color: '#e3baa0' },
+                            { name: '1995-2001', years: '1995 - 2001', klasse: 'I', color: '#f2d4b9' },
+                            { name: '2002-2009', years: '2002 - 2009', klasse: 'J', color: '#f5e6d2' },
+                            { name: 'nach 2009', years: '≥ 2010', klasse: 'K', color: '#faf8f3' }
+                        ];
+                        classes.forEach(cls => {
+                            legendHTML += `<div class="legend-item"><span class="legend-color" style="background: ${cls.color};"></span><span style="color: #2c3e50;">${cls.years}</span> <strong style="color: #2c3e50;">(${cls.klasse})</strong><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Baualtersklasse ${cls.klasse}</span></div>`;
+                        });
+                        legendContainer.innerHTML = legendHTML;
+                    });
+                return; // Wird asynchron aktualisiert
+            }
+            
+            legendContainer.innerHTML = legendHTML;
+        }
+        
+        // Layer-Auswahl über Radio-Buttons in der Sidebar
+        let activeLayerType = 'spez_waermebedarf'; // Standard-Layer
+        
+        // Event-Handler für Radio-Button-Auswahl
+        document.querySelectorAll('#layer-selection input[type="radio"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.checked) {
+                    activeLayerType = this.value;
+                    loadLayer(activeLayerType);
+                }
+            });
+        });
+        
+        // Lade automatisch den spez. Wärmebedarf-Layer beim Start
+        window.addEventListener('load', function() {
+            loadLayer(activeLayerType);
+        });
+        
+        // Lade Statistiken
+        function loadStats() {
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(stats => {
+                    document.getElementById('stat-buildings').textContent = stats.total_buildings || '-';
+                    document.getElementById('stat-area').textContent = 
+                        stats.total_area ? (stats.total_area / 1000).toFixed(1) + ' Tm²' : '-';
+                    document.getElementById('stat-waermebedarf').textContent = 
+                        stats.waermebedarf_total ? (stats.waermebedarf_total / 1000).toFixed(0) + ' MWh/a' : '-';
+                    document.getElementById('stat-spez-waermebedarf').textContent = 
+                        stats.spez_waermebedarf_mean ? stats.spez_waermebedarf_mean.toFixed(1) + ' kWh/m²a' : '-';
+                })
+                .catch(error => console.error('Fehler beim Laden der Statistiken:', error));
+        }
+        
+        // Initialisiere Statistiken
+        loadStats();
+
+        // Sanierungsannahmen
+        let sanierungAssumptions = [];
+
+        function getSelectedBuildingTypes() {
+            const typeInputs = document.querySelectorAll('#sanierung-types input[type="checkbox"]');
+            const selected = [];
+            let allSelected = false;
+            typeInputs.forEach(input => {
+                if (input.value === 'all' && input.checked) {
+                    allSelected = true;
+                } else if (input.checked) {
+                    selected.push(input.value);
+                }
+            });
+            return allSelected ? [] : selected;
+        }
+
+        function getSelectedParts() {
+            const partInputs = document.querySelectorAll('#sanierung-parts input[type="checkbox"]');
+            return Array.from(partInputs)
+                .filter(input => input.checked)
+                .map(input => input.value);
+        }
+
+        function getSanierungFormData() {
+            return {
+                name: document.getElementById('sanierung-name').value,
+                density: parseFloat(document.getElementById('sanierung-density').value),
+                cycle: document.getElementById('sanierung-cycle').value,
+                depth: document.getElementById('sanierung-depth').value,
+                building_types: getSelectedBuildingTypes(),
+                baujahr_from: document.getElementById('sanierung-baujahr-from').value,
+                baujahr_to: document.getElementById('sanierung-baujahr-to').value,
+                custom_parts: getSelectedParts()
+            };
+        }
+
+        function applySanierungFormData(data) {
+            if (!data) return;
+            document.getElementById('sanierung-name').value = data.name || '';
+            document.getElementById('sanierung-density').value = data.density ?? 0;
+            document.getElementById('sanierung-cycle').value = data.cycle || '2002-2009';
+            document.getElementById('sanierung-depth').value = data.depth || 'vollsaniert';
+            document.getElementById('sanierung-baujahr-from').value = data.baujahr_from ?? '';
+            document.getElementById('sanierung-baujahr-to').value = data.baujahr_to ?? '';
+
+            const typeInputs = document.querySelectorAll('#sanierung-types input[type="checkbox"]');
+            typeInputs.forEach(input => {
+                if (input.value === 'all') {
+                    input.checked = !data.building_types || data.building_types.length === 0;
+                } else {
+                    input.checked = data.building_types?.includes(input.value) || false;
+                }
+            });
+
+            const partInputs = document.querySelectorAll('#sanierung-parts input[type="checkbox"]');
+            partInputs.forEach(input => {
+                input.checked = data.custom_parts?.includes(input.value) || false;
+            });
+        }
+
+        function refreshSanierungSelect() {
+            const select = document.getElementById('sanierung-saved');
+            select.innerHTML = '';
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = 'Bitte auswählen...';
+            select.appendChild(placeholder);
+
+            sanierungAssumptions.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = item.name || item.id;
+                select.appendChild(option);
+            });
+        }
+
+        function loadSanierungAssumptions() {
+            fetch('/api/sanierung-assumptions')
+                .then(response => response.json())
+                .then(data => {
+                    sanierungAssumptions = Array.isArray(data) ? data : [];
+                    refreshSanierungSelect();
+                })
+                .catch(error => console.error('Fehler beim Laden der Sanierungsannahmen:', error));
+        }
+
+        function loadSanierungZyklen() {
+            const select = document.getElementById('sanierung-cycle');
+            select.innerHTML = '';
+
+            fetch('/api/sanierung-zyklen')
+                .then(response => response.json())
+                .then(data => {
+                    const cycles = Array.isArray(data) ? data : [];
+                    cycles.forEach((cycle, idx) => {
+                        const option = document.createElement('option');
+                        option.value = cycle;
+                        option.textContent = cycle;
+                        if (idx === cycles.length - 1) {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('Fehler beim Laden der Sanierungszyklen:', error);
+                });
+        }
+
+        function loadSelectedSanierungAssumption() {
+            const select = document.getElementById('sanierung-saved');
+            const id = select.value;
+            if (!id) return;
+            const item = sanierungAssumptions.find(a => a.id === id);
+            if (item) {
+                applySanierungFormData(item);
+            }
+        }
+
+        function runSanierungSimulation() {
+            const loading = document.getElementById('loading');
+            const btn = document.getElementById('sanierung-simulate-btn');
+
+            if (btn.disabled) return;
+            if (!confirm('Sanierungssimulation durchführen und GPKG neu berechnen?')) return;
+
+            loading.classList.add('active');
+            btn.disabled = true;
+            btn.textContent = 'Berechne...';
+
+            const payload = { assumption: getSanierungFormData() };
+            fetch('/api/sanierung-simulate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Fehler bei Sanierung: ' + data.error);
+                    return;
+                }
+
+                if (currentLayer) {
+                    loadLayer(activeLayerType);
+                }
+                loadStats();
+                alert(`Sanierung erfolgreich!\n\nKandidaten: ${data.statistics.candidates}\nAngewandt: ${data.statistics.applied}\nNicht zugeordnet: ${data.statistics.unmatched}`);
+            })
+            .catch(error => {
+                console.error('Fehler bei Sanierung:', error);
+                alert('Fehler bei Sanierung: ' + error.message);
+            })
+            .finally(() => {
+                loading.classList.remove('active');
+                btn.disabled = false;
+                btn.textContent = 'Sanierung simulieren';
+            });
+        }
+
+        document.getElementById('sanierung-simulate-btn').addEventListener('click', runSanierungSimulation);
+        document.getElementById('sanierung-saved').addEventListener('change', loadSelectedSanierungAssumption);
+
+        // Gebäudetypen: "Alle" vs Einzeltypen
+        document.querySelectorAll('#sanierung-types input[type="checkbox"]').forEach(input => {
+            input.addEventListener('change', () => {
+                const allInput = document.querySelector('#sanierung-types input[value="all"]');
+                if (input.value === 'all' && input.checked) {
+                    document.querySelectorAll('#sanierung-types input[type="checkbox"]').forEach(i => {
+                        if (i.value !== 'all') i.checked = false;
+                    });
+                } else if (input.value !== 'all' && input.checked) {
+                    allInput.checked = false;
+                }
+            });
+        });
+
+        loadSanierungAssumptions();
+        loadSanierungZyklen();
+
+        // Klima-Simulation
+        function populateKlimaYears() {
+            const select = document.getElementById('klima-year');
+            select.innerHTML = '';
+            for (let year = 2024; year <= 2050; year += 1) {
+                const option = document.createElement('option');
+                option.value = String(year);
+                option.textContent = String(year);
+                if (year === 2030) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            }
+        }
+
+        function getKlimaFormData() {
+            return {
+                scenario: document.getElementById('klima-scenario').value,
+                year: parseInt(document.getElementById('klima-year').value, 10)
+            };
+        }
+
+        function runKlimaSimulation() {
+            const loading = document.getElementById('loading');
+            const btn = document.getElementById('klima-simulate-btn');
+
+            if (btn.disabled) return;
+            if (!confirm('Klimaszenario anwenden und GPKG neu berechnen?')) return;
+
+            loading.classList.add('active');
+            btn.disabled = true;
+            btn.textContent = 'Berechne...';
+
+            const payload = { assumption: getKlimaFormData() };
+            fetch('/api/klima-simulate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Fehler bei Klima-Simulation: ' + data.error);
+                    return;
+                }
+
+                if (currentLayer) {
+                    loadLayer(activeLayerType);
+                }
+                loadStats();
+                alert(`Klima-Simulation erfolgreich!\n\nHDD: ${data.statistics.hdd.toFixed(0)}\nRHDD: ${data.statistics.rhdd.toFixed(0)}\nZugeordnet: ${data.statistics.matched}\nNicht zugeordnet: ${data.statistics.unmatched}`);
+            })
+            .catch(error => {
+                console.error('Fehler bei Klima-Simulation:', error);
+                alert('Fehler bei Klima-Simulation: ' + error.message);
+            })
+            .finally(() => {
+                loading.classList.remove('active');
+                btn.disabled = false;
+                btn.textContent = 'Klima simulieren';
+            });
+        }
+
+        document.getElementById('klima-simulate-btn').addEventListener('click', runKlimaSimulation);
+        populateKlimaYears();
+    </script>
+</body>
+</html>
+
