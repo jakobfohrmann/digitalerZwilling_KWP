@@ -460,7 +460,6 @@
         <div class="sanierung-group">
             <label class="sanierung-label" for="klima-scenario">Klimaszenario</label>
             <select id="klima-scenario" class="sanierung-select">
-                <option value="rcp26">RCP 2.6</option>
                 <option value="rcp45">RCP 4.5</option>
                 <option value="rcp85">RCP 8.5</option>
             </select>
@@ -1008,18 +1007,58 @@
         loadSanierungZyklen();
 
         // Klima-Simulation
+        let klimaOptionsCache = null;
+
         function populateKlimaYears() {
             const select = document.getElementById('klima-year');
+            const scenario = document.getElementById('klima-scenario').value;
+            const yearsByScenario = klimaOptionsCache?.years_by_scenario || {};
+            const years = yearsByScenario[scenario] || [];
             select.innerHTML = '';
-            for (let year = 2024; year <= 2050; year += 1) {
+
+            years.forEach((year) => {
                 const option = document.createElement('option');
                 option.value = String(year);
                 option.textContent = String(year);
-                if (year === 2030) {
-                    option.selected = true;
-                }
                 select.appendChild(option);
+            });
+
+            if (years.length > 0) {
+                const preferredYear = 2030;
+                const selectedYear = years.includes(preferredYear) ? preferredYear : years[Math.floor(years.length / 2)];
+                select.value = String(selectedYear);
             }
+        }
+
+        function loadKlimaOptions() {
+            fetch('/api/klima-options')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Fehler bei Klima-Optionen:', data.error);
+                        return;
+                    }
+                    klimaOptionsCache = data;
+                    const scenarioSelect = document.getElementById('klima-scenario');
+                    const currentScenario = scenarioSelect.value;
+                    scenarioSelect.innerHTML = '';
+
+                    (data.scenarios || []).forEach((scenario) => {
+                        const option = document.createElement('option');
+                        option.value = scenario;
+                        option.textContent = scenario.toUpperCase().replace('RCP', 'RCP ');
+                        scenarioSelect.appendChild(option);
+                    });
+
+                    if ((data.scenarios || []).includes(currentScenario)) {
+                        scenarioSelect.value = currentScenario;
+                    } else if ((data.scenarios || []).length > 0) {
+                        scenarioSelect.value = data.scenarios[0];
+                    }
+
+                    populateKlimaYears();
+                })
+                .catch(error => console.error('Fehler beim Laden der Klima-Optionen:', error));
         }
 
         function getKlimaFormData() {
@@ -1057,7 +1096,19 @@
                     loadLayer(activeLayerType);
                 }
                 loadStats();
-                alert(`Klima-Simulation erfolgreich!\n\nHDD: ${data.statistics.hdd.toFixed(0)}\nRHDD: ${data.statistics.rhdd.toFixed(0)}\nZugeordnet: ${data.statistics.matched}\nNicht zugeordnet: ${data.statistics.unmatched}`);
+                alert(
+                    `Klima-Simulation erfolgreich!\n\n` +
+                    `HDD: ${data.statistics.hdd.toFixed(2)}\n` +
+                    `RHDD: ${data.statistics.rhdd.toFixed(2)}\n` +
+                    `G_Hor: ${data.statistics.g_hor.toFixed(2)}\n` +
+                    `G_Hor_HD: ${data.statistics.g_hor_hd.toFixed(2)}\n` +
+                    `G_E_HD: ${data.statistics.g_e_hd.toFixed(2)}\n` +
+                    `G_S_HD: ${data.statistics.g_s_hd.toFixed(2)}\n` +
+                    `G_W_HD: ${data.statistics.g_w_hd.toFixed(2)}\n` +
+                    `G_N_HD: ${data.statistics.g_n_hd.toFixed(2)}\n` +
+                    `Zugeordnet: ${data.statistics.matched}\n` +
+                    `Nicht zugeordnet: ${data.statistics.unmatched}`
+                );
             })
             .catch(error => {
                 console.error('Fehler bei Klima-Simulation:', error);
@@ -1071,7 +1122,8 @@
         }
 
         document.getElementById('klima-simulate-btn').addEventListener('click', runKlimaSimulation);
-        populateKlimaYears();
+        document.getElementById('klima-scenario').addEventListener('change', populateKlimaYears);
+        loadKlimaOptions();
     </script>
 </body>
 </html>

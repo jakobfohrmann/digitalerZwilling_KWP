@@ -40,5 +40,17 @@
         "name": "Klima RCP26 2047",
         "scenario": "rcp26",
         "year": 2047
+    },
+    {
+        "id": "70754d78-8ad2-4857-8896-486a5a8785a0",
+        "name": "Klima RCP85 2100",
+        "scenario": "rcp85",
+        "year": 2100
+    },
+    {
+        "id": "72592e18-93f9-4610-bcc3-e6230b065994",
+        "name": "Klima RCP45 2092",
+        "scenario": "rcp45",
+        "year": 2092
     }
 ]

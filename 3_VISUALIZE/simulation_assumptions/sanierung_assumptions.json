@@ -64,5 +64,22 @@
             "fenster",
             "tuer"
         ]
+    },
+    {
+        "id": "eb48acdd-cff2-49a7-99f2-2a4ec4dd06a1",
+        "name": "Mehrfamilienhaus, Altbau",
+        "density": 80.0,
+        "cycle": "1982",
+        "depth": "custom",
+        "building_types": [
+            "MFH"
+        ],
+        "baujahr_from": 1900,
+        "baujahr_to": 1930,
+        "custom_parts": [
+            "dach",
+            "fenster",
+            "tuer"
+        ]
     }
 ]

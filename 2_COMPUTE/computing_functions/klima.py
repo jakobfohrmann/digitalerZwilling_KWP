@@ -11,23 +11,20 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-from energie_ref_berechnung import Energie, create_energie_instanzen
+from energie_ref_berechnung import create_energie_instanzen
 from paths import PARAMS_KLIMA_GEB
 from gebaeudetypologie_loader import load_gebaeudetypologie
 from helpers import baujahr_to_baualtersklasse, find_matching_referenz, scale_energie_values, ENERGIE_SPALTEN
 
 
-def load_climate_scenarios(csv_path: Optional[str] = None) -> pd.DataFrame:
-    """Lädt HDD/RHDD-Szenarien aus CSV."""
+def load_climate_solar_scenarios(csv_path: Optional[str] = None) -> pd.DataFrame:
+    """Lädt erweiterte Klima+Solar-Szenarien aus CSV."""
     if csv_path is None:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         possible_paths = [
-            str(PARAMS_KLIMA_GEB / "annual_hdd_rhdd_all_scenarios.csv"),
-            os.path.join(script_dir, "annual_hdd_rhdd_all_scenarios.csv"),
-            "annual_hdd_rhdd_all_scenarios.csv",
-            "2_COMPUTE/annual_hdd_rhdd_all_scenarios.csv",
-            "data/annual_hdd_rhdd_all_scenarios.csv",
-            "../data/annual_hdd_rhdd_all_scenarios.csv",
+            str(PARAMS_KLIMA_GEB / "annual_climate_solar_projections_2100.csv"),
+            os.path.join(script_dir, "annual_climate_solar_projections_2100.csv"),
+            "annual_climate_solar_projections_2100.csv",
         ]
         for path in possible_paths:
             if os.path.exists(path):
@@ -35,30 +32,45 @@ def load_climate_scenarios(csv_path: Optional[str] = None) -> pd.DataFrame:
                 break
 
     if csv_path is None or not os.path.exists(csv_path):
-        raise FileNotFoundError('annual_hdd_rhdd_all_scenarios.csv nicht gefunden.')
+        raise FileNotFoundError("annual_climate_solar_projections_2100.csv nicht gefunden.")
 
     df = pd.read_csv(csv_path)
-    if not {'year', 'scenario', 'HDD', 'RHDD'}.issubset(df.columns):
-        raise ValueError('CSV enthält nicht die benötigten Spalten: year, scenario, HDD, RHDD')
-
+    required = {
+        "year",
+        "scenario",
+        "HDD",
+        "HD",
+        "RHDD",
+        "G_Hor",
+        "G_Hor_HD",
+        "G_E_HD",
+        "G_S_HD",
+        "G_W_HD",
+        "G_N_HD",
+    }
+    if not required.issubset(df.columns):
+        raise ValueError(
+            "CSV enthält nicht die benötigten Spalten: year, scenario, HDD, HD, RHDD, G_Hor, "
+            "G_Hor_HD, G_E_HD, G_S_HD, G_W_HD, G_N_HD"
+        )
     return df
 
 
 def normalize_scenario_name(scenario: str) -> str:
-    """Normalisiert Szenarionamen (rcp26/rcp45/rcp85)."""
+    """Normalisiert Szenarionamen (rcp45/rcp85)."""
     scenario_clean = str(scenario).strip().lower().replace(' ', '')
-    if scenario_clean.startswith('rcp') and '_' not in scenario_clean:
-        return f"{scenario_clean}_2024_2050"
+    if scenario_clean.startswith('rcp') and '_' in scenario_clean:
+        return scenario_clean.split('_')[0]
     return scenario_clean
 
 
-def get_hdd_rhdd_for_scenario(
+def get_climate_values_for_scenario(
     year: int,
     scenario: str,
     csv_path: Optional[str] = None
-) -> Tuple[float, float]:
-    """Gibt HDD/RHDD für ein Jahr und Szenario zurück."""
-    df = load_climate_scenarios(csv_path)
+) -> Dict[str, float]:
+    """Gibt Klima-/Strahlungswerte für ein Jahr und Szenario zurück."""
+    df = load_climate_solar_scenarios(csv_path)
     scenario_key = normalize_scenario_name(scenario)
 
     try:
@@ -71,7 +83,28 @@ def get_hdd_rhdd_for_scenario(
         raise ValueError(f'Keine Klimadaten für {scenario_key} im Jahr {year_int} gefunden.')
 
     row = match.iloc[0]
-    return float(row['HDD']), float(row['RHDD'])
+    return {
+        "year": float(row["year"]),
+        "HDD": float(row["HDD"]),
+        "HD": float(row["HD"]),
+        "RHDD": float(row["RHDD"]),
+        "G_Hor": float(row["G_Hor"]),
+        "G_Hor_HD": float(row["G_Hor_HD"]),
+        "G_E_HD": float(row["G_E_HD"]),
+        "G_S_HD": float(row["G_S_HD"]),
+        "G_W_HD": float(row["G_W_HD"]),
+        "G_N_HD": float(row["G_N_HD"]),
+    }
+
+
+def get_hdd_rhdd_for_scenario(
+    year: int,
+    scenario: str,
+    csv_path: Optional[str] = None
+) -> Tuple[float, float]:
+    """Kompatibilitätsfunktion: Gibt HDD/RHDD zurück."""
+    climate_values = get_climate_values_for_scenario(year, scenario, csv_path)
+    return climate_values["HDD"], climate_values["RHDD"]
 
 
 
@@ -84,8 +117,11 @@ def apply_klima_simulation(
     klima_csv_path: Optional[str] = None
 ) -> Tuple[gpd.GeoDataFrame, Dict]:
     """Wendet Klimaszenario an und berechnet Energiewerte neu."""
-    hdd, rhdd = get_hdd_rhdd_for_scenario(year, scenario, csv_path=klima_csv_path)
-    energie_liste = create_energie_instanzen(energy_params=energy_params, climate_hdd_rhdd=(hdd, rhdd))
+    climate_values = get_climate_values_for_scenario(year, scenario, csv_path=klima_csv_path)
+    energie_liste = create_energie_instanzen(
+        energy_params=energy_params,
+        climate_overrides=climate_values
+    )
     gebaeude_liste = load_gebaeudetypologie()
 
     # Spalten für Simulation
@@ -166,8 +202,15 @@ def apply_klima_simulation(
         'total_buildings': len(gdf),
         'matched': matched_count,
         'unmatched': unmatched_count,
-        'hdd': hdd,
-        'rhdd': rhdd,
+        'hdd': climate_values["HDD"],
+        'hd': climate_values["HD"],
+        'rhdd': climate_values["RHDD"],
+        'g_hor': climate_values["G_Hor"],
+        'g_hor_hd': climate_values["G_Hor_HD"],
+        'g_e_hd': climate_values["G_E_HD"],
+        'g_s_hd': climate_values["G_S_HD"],
+        'g_w_hd': climate_values["G_W_HD"],
+        'g_n_hd': climate_values["G_N_HD"],
         'scenario': normalize_scenario_name(scenario),
         'year': int(year)
     }

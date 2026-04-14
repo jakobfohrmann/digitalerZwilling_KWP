@@ -1,6 +1,8 @@
-# Workflow: Gebäudedaten Sachsen und LOD1-CityGML verknüpfen
+# Workflow: ETL für Gebäudedaten bis Heizwärmebedarf
 
-Diese Anleitung beschreibt das übliche Vorgehen, um sächsische Gebäude-Vektordaten mit Attributen aus LOD1-CityGML zu verbinden (räumlicher Abgleich per größter Schnittfläche). Die genauen Produktnamen und Downloadpfade auf [Geodaten Sachsen](https://www.geodaten.sachsen.de/) können sich ändern; dort die aktuellen Liegenschafts- bzw. Gebäudedaten und die passenden LOD1-GML-Kacheln für den Untersuchungsraum auswählen.
+Die ETL-Prozesse sind ein notwendiger Vorbereitungsschritt, um die spätere Berechnung der Heizwärmebedarfe zu ermöglichen. Diese Anleitung betrachtet die ETL-Kette ganzheitlich: von der Rohdatenaufbereitung über die fünf ETL-Schritte bis zur Übergabe der aufbereiteten Gebäudedaten für `2_COMPUTE`.
+
+Die genauen Produktnamen und Downloadpfade auf [Geodaten Sachsen](https://www.geodaten.sachsen.de/) können sich ändern; dort die aktuellen Liegenschafts- bzw. Gebäudedaten und die passenden LOD1-GML-Kacheln für den Untersuchungsraum auswählen.
 
 ## Überblick: Preprocessing und Hauptpipeline
 
@@ -8,37 +10,20 @@ Diese Anleitung beschreibt das übliche Vorgehen, um sächsische Gebäude-Vektor
 
 | Vorbereitung | Skript | Zweck |
 |--------------|--------|--------|
-| **1 – Gemeinde / AGS** | `input/grundkarte_liegenschaftskataster/preprocess_filter_gemeinde.py` | Roh-Gebäude-GPKG nach **Amtlichem Gemeindeschlüssel (AGS)** einschränken. Ausgabe z. B. nach `input/gpkg_filtered/` oder `input/grundkarte_liegenschaftskataster/gpkg_filtered/`. |
-| **2 – Zensus Baualter** | `input/zensus_baualtersklassen/preprocess_zensus_baualter.py` | Zensus-**Baualtersklassen** (CSV) als **GPKG** mit Gitter-Polygonen (z. B. 100 m), für **ETL-Schritt 4** (Baujahr aus Gitter-Häufigkeiten). |
+| **1 – Gemeinde / AGS** | `input/grundkarte_liegenschaftskataster/preprocess_filter_gemeinde.py` | Gebäudeanzahl auf die gewählte Gemeinde bzw. den gewählten Ort in Sachsen beschränken (Filter über **AGS**). Ausgabe z. B. nach `input/gpkg_filtered/` oder `input/grundkarte_liegenschaftskataster/gpkg_filtered/`. |
+| **2 – Zensus Baualter** | `input/zensus_baualtersklassen/preprocess_zensus_baualter.py` | Zensusdaten so aufbereiten, dass sie in **ETL-Schritt 4** zur Ermittlung der Baujahre genutzt werden können (CSV → GPKG mit Gitter-Polygonen). |
 
 **Hauptpipeline** (Gebäude-GPKG weiterverarbeiten, in der Regel der Reihe nach):
 
 | ETL | Skript | Kurzbeschreibung |
 |-----|--------|------------------|
-| **1** | `etl_schritt1_spatial_join.py` | LOD1-CityGML mit GPKG **joinen** (größte Schnittfläche). |
-| **2** | `etl_schritt2_filter_gebaeudefunktion.py` | Optional nach **GFK** filtern (z. B. Wohngebäude). |
-| **3** | `etl_schritt3_hoehe_flaeche_geschosse.py` | **Dach- / Traufhöhe**, `geschoss_hoehe_m`, **`bezugsflaeche`**, **`anzahl_geschosse`** (geschätzt aus Traufhöhe) |
-| **4** | `etl_schritt4_baujahr.py` | **Baujahr** / Denkmal (Flächendenkmal + Zensus-Gitter). |
-| **5** | `etl_schritt5_gebaeudetyp.py` | **Gebäudetyp** (Wohn: EFH, RH, MFH, …) aus Spalten von **Schritt 3** (in der `*_schritt4.gpkg` durchgereicht) → `output/output_step5/` |
+| **1** | `etl_schritt1_spatial_join.py` | Spatial Join, um Informationen aus dem 3D-Modell mit der 2D-Grundkarte zu verknüpfen. |
+| **2** | `etl_schritt2_filter_gebaeudefunktion.py` | Filterung der Gebäude auf Wohngebäude. |
+| **3** | `etl_schritt3_hoehe_flaeche_geschosse.py` | Ermittlung von Dach- und Traufhöhe sowie Geschossanzahl und Bezugsfläche. |
+| **4** | `etl_schritt4_baujahr.py` | Gebäudescharfe Approximation des Baujahres. |
+| **5** | `etl_schritt5_gebaeudetyp.py` | Approximation des jeweiligen Gebäudetyps. |
 
 Preprocessing 1 ist für eine fokussierte Region **empfohlen** (sonst sehr große GPKG). Preprocessing 2 ist für Schritt 4 **nötig**, wenn Baujahre aus dem Zensus-Gitter kommen sollen (Flächendenkmal allein reicht nicht für alle Gebäude).
-
-### Hauptpipeline: Reihenfolge der ETL-Schritte
-
-| Schritt | Eingabe (Standard) | Ausgabe | Inhalt |
-|---------|-------------------|---------|--------|
-| **1** | `input/gpkg_filtered/` … → GPKG + `input/lod1/*.gml` | `output/output_step1/<Basis>_schritt1.gpkg` | LOD1 per **größter Schnittfläche** joinen; Präfix `lod1_` |
-| **2** | `output/output_step1/*_schritt1.gpkg` | `output/output_step2/<Basis>_schritt2.gpkg` | Optional, üblich: **GFK**-Filter (z. B. Wohngebäude) |
-| **3** | `output/output_step2/*_schritt2.gpkg` | `output/output_step3/<Basis>_schritt3.gpkg` | Dach-/Traufhöhe, `geschoss_hoehe_m`, **`bezugsflaeche`**, **`anzahl_geschosse`** |
-| **4** | `output/output_step3/*_schritt3.gpkg` | `output/output_step4/<Basis>_schritt4.gpkg` | **Baujahr**, **Denkmal** (Flächendenkmal + Zensus, optional) |
-| **5** | `output/output_step4/*_schritt4.gpkg` | `output/output_step5/<Basis>_schritt5.gpkg` | **Gebäudetyp** (`gebaeudetyp`) |
-
-Schritt 2 kann umgangen werden, wenn du eine andere `*_schritt1.gpkg` direkt an Schritt 3 übergibst — Standardpfade erwarten aber typischerweise Schritt 2.
-
-## Ziel
-
-- Gebäudepolygone (GeoPackage) mit LOD1-Gebäuden (CityGML) **left joinen**: alle Zeilen aus dem GPKG bleiben erhalten; LOD1-Attribute werden ergänzt, wo sich Fußabdrücke sinnvoll schneiden.
-- Optional auf **AGS** einschränken, zusätzliche Attribute (Höhe, Baujahr, …) in den weiteren Schritten.
 
 ## Voraussetzungen
 
@@ -48,20 +33,6 @@ Schritt 2 kann umgangen werden, wenn du eine andere `*_schritt1.gpkg` direkt an 
 ```bash
 pip install -r requirements.txt
 ```
-
-## Ordnerstruktur im Projekt
-
-| Pfad | Inhalt |
-|------|--------|
-| `input/gpkg_raw/` | Rohdownload der Liegenschafts-/Gebäude-GPKG von Geodaten Sachsen |
-| `input/gpkg_filtered/` | Nach AGS gefilterte GPKG — **wird von ETL-Schritt 1 zuerst gesucht** |
-| `input/grundkarte_liegenschaftskataster/` | Preprocessing-Skripte; optional `gpkg_filtered/` für gefilterte GPKG (gleiche Priorität wie oben, siehe ETL-Schritt 1) |
-| `input/lod1/` | LOD1-`.gml`-Dateien (direkt in diesem Ordner; alle `*.gml` werden eingelesen) |
-| `input/zensus_baualtersklassen/` | Zensus-CSV + `preprocess_zensus_baualter.py` → `zensus_baualter.gpkg` |
-| `input/flaechendenkmal/` | Optional: Flächendenkmal-GPKG für ETL-Schritt 4 |
-| `output/` | Ergebnisse: `output_step1/` … `output_step5/` |
-
-Rohdaten liegen bewusst **nicht** im Repository (siehe `.gitignore`).
 
 ## Rohdaten beschaffen und ablegen
 
@@ -140,7 +111,7 @@ Skript: **`etl_schritt3_hoehe_flaeche_geschosse.py`**
 - **Neue Spalten:**
   - **`dach_hoehe_m`**, **`trauf_hoehe_m`** — vereinfachtes Satteldach bzw. Flachdach (siehe Docstring im Skript).
   - **`geschoss_hoehe_m`** — grobe Kennzahl: ganzzahliger Anteil `trauf_hoehe_m // 3` (Meter).
-  - **`bezugsflaeche`** — **größtes Polygon** der Geometrie (Fußabdruckfläche in m² im CRS) × **`geschoss_hoehe_m`** (Produkt als Kenngröße, m³); dient als einheitliche Bezugsgröße für spätere Auswertungen.
+  - **`bezugsflaeche`** — **größtes Polygon** der Geometrie (Fußabdruckfläche in m² im CRS) × **`geschoss_hoehe_m`** × **0.85** (Kenngröße in m³); dient als einheitliche Bezugsgröße für spätere Auswertungen.
   - **`anzahl_geschosse`** — geschätzte **Anzahl oberirdischer Geschosse** aus `trauf_hoehe_m` (Annahme ~3 m Geschosshöhe, siehe Docstring); wird in **ETL-Schritt 5** für die Gebäudetyp-Regeln genutzt.
 - **Eingabe-Datei:** Standard: erste `*_schritt2.gpkg` unter `output/output_step2/` (alternativ Pfad als Argument).
 - **Ausgabe:** `output/output_step3/<Basis>_schritt3.gpkg`.
@@ -172,7 +143,7 @@ python etl_schritt4_baujahr.py --no-gitter
 Skript: **`etl_schritt5_gebaeudetyp.py`**
 
 - **Eingabe:** Standard: erste `*_schritt4.gpkg` unter `output/output_step4/` (alternativ Pfad als Argument).
-- **Voraussetzungen:** Die in **Schritt 3** angelegten Spalten **`trauf_hoehe_m`**, **`dach_hoehe_m`**, **`bezugsflaeche`**, **`anzahl_geschosse`** (über Schritt 4 unverändert in der Eingabe-GPKG). Es werden **keine** ALKIS-Felder wie `anzahlDOberirdischenGeschosse` / `objekthoehe` verwendet. **Geschosszahl** kommt aus **`anzahl_geschosse`**; **Höhen-Proxy** für MFH/GMH/HH: **`trauf_hoehe_m + dach_hoehe_m`** (siehe Docstring im Skript).
+- **Voraussetzungen:** Die in **Schritt 3** angelegten Spalten **`trauf_hoehe_m`**, **`dach_hoehe_m`**, **`bezugsflaeche`**, **`anzahl_geschosse`** (über Schritt 4 unverändert in der Eingabe-GPKG). Es werden **keine** ALKIS-Felder wie `anzahlDOberirdischenGeschosse` / `objekthoehe` verwendet. **Geschosszahl** kommt aus **`anzahl_geschosse`**; die HH-Abgrenzung nutzt aktuell **`lod1_measuredHeight_m`** und nicht `trauf_hoehe_m + dach_hoehe_m`.
 - **Inhalt:** Keine Auswahl nach übergeordneter Gebäudefunktion — die typische Eingrenzung auf Wohngebäude erfolgt in **Schritt 2 (GFK)**. Klassifikation u. a. EFH, RH, MFH, GMH, HH: **EFH/RH** u. a. über **Fußabdruckfläche** (größtes Polygon, m²) ≤ 400 und **`anzahl_geschosse`** unter 3; RH, wenn ein berührendes Nachbargebäude mit ähnlicher Fläche existiert.
 - **Ausgabe:** `output/output_step5/<Basis>_schritt5.gpkg` mit Spalte **`gebaeudetyp`**.
 
@@ -184,15 +155,6 @@ python etl_schritt5_gebaeudetyp.py output/output_step4/gebaeude_leipzig_schritt4
 
 ## Ergebnis nutzen
 
-- **GPKG:** Pro Schritt unter `output/output_stepN/`; für die **vollständige Attributkette** typischerweise die Datei aus **`output/output_step5/`** (enthält alle vorherigen Spalten plus `gebaeudetyp`) oder je nach Bedarf ein Zwischenstand aus Schritt 3 oder 4.
-- **CSV (optional, nur ETL-Schritt 1):** mit `--csv` — tabellarisch ohne Geometrie.
+Nach den ETL-Schritten kann das Ergebnis direkt in `2_COMPUTE` verwendet werden, um die Wärmebedarfe zu berechnen.
 
-## Nächste Schritte (nicht Teil dieser Skripte)
-
-- Weitere Attribute oder Qualitätsprüfungen.
-- Manuelle Ergänzungen in GIS.
-
-## Weitere Skripte im Repository
-
-- **Preprocessing:** `preprocess_filter_gemeinde.py` (AGS), `preprocess_zensus_baualter.py` (Zensus-Gitter).
-- **Pipeline:** `etl_schritt1_spatial_join.py` … `etl_schritt5_gebaeudetyp.py`. CityGML-Attributlogik in **`etl_schritt1_spatial_join.py`** (bldg-Felder und Generics).
+Standardfall: die vollständige Datei aus `output/output_step5/` (inklusive `gebaeudetyp`). Im aktuellen Schritt-5-Skript wird diese Ausgabe zusätzlich automatisch nach `2_COMPUTE/computing_inputs/` kopiert und steht damit direkt für die Berechnung bereit.

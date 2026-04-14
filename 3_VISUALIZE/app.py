@@ -26,7 +26,7 @@ from sanierung import (
     normalize_sanierung_assumption,
     apply_sanierung_simulation,
 )
-from klima import apply_klima_simulation
+from klima import apply_klima_simulation, load_climate_solar_scenarios
 from helpers import (
     baujahr_to_baualtersklasse,
     find_matching_referenz,
@@ -126,16 +126,32 @@ def normalize_klima_assumption(data: Dict) -> Tuple[Optional[Dict], Optional[str
         return None, 'Ungültige Datenstruktur'
 
     scenario = str(data.get('scenario', '')).strip().lower()
-    if scenario not in ['rcp26', 'rcp45', 'rcp85']:
-        return None, 'Klimaszenario ist ungültig'
+    try:
+        climate_df = load_climate_solar_scenarios()
+    except Exception as e:
+        return None, f'Klimadaten konnten nicht geladen werden: {e}'
+
+    available_scenarios = sorted(climate_df['scenario'].astype(str).str.lower().unique().tolist())
+    if scenario not in available_scenarios:
+        return None, f'Klimaszenario ist ungültig. Verfügbar: {", ".join(available_scenarios)}'
 
     try:
         year = int(data.get('year'))
     except (ValueError, TypeError):
         return None, 'Jahr ist ungültig'
 
-    if year < 2024 or year > 2050:
-        return None, 'Jahr muss zwischen 2024 und 2050 liegen'
+    available_years = (
+        climate_df[climate_df['scenario'].astype(str).str.lower() == scenario]['year']
+        .astype(int)
+        .unique()
+        .tolist()
+    )
+    if year not in available_years:
+        min_year = min(available_years) if available_years else None
+        max_year = max(available_years) if available_years else None
+        if min_year is not None and max_year is not None:
+            return None, f'Jahr muss für {scenario} zwischen {min_year} und {max_year} liegen'
+        return None, f'Jahr ist für {scenario} nicht verfügbar'
 
     name = str(data.get('name', '')).strip() or f"Klima {scenario.upper()} {year}"
 
@@ -378,6 +394,31 @@ def prepare_geojson_for_layer(gdf: gpd.GeoDataFrame, layer_type: str) -> Dict:
 def index():
     """Hauptseite mit interaktiver Karte"""
     return render_template("map.html")
+
+
+@app.route('/api/klima-options', methods=['GET'])
+def klima_options():
+    """API Endpoint für verfügbare Klima-Szenarien und Jahre."""
+    try:
+        climate_df = load_climate_solar_scenarios()
+        scenarios = sorted(climate_df['scenario'].astype(str).str.lower().unique().tolist())
+        years = sorted(climate_df['year'].astype(int).unique().tolist())
+        years_by_scenario = {
+            scenario: sorted(
+                climate_df[climate_df['scenario'].astype(str).str.lower() == scenario]['year']
+                .astype(int)
+                .unique()
+                .tolist()
+            )
+            for scenario in scenarios
+        }
+        return jsonify({
+            'scenarios': scenarios,
+            'years': years,
+            'years_by_scenario': years_by_scenario
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/layer/<layer_type>')

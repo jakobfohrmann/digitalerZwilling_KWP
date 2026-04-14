@@ -70,7 +70,8 @@ def create_energie_instanzen_for_gebaeude(
     gebaeude_liste: List[Gebaeude],
     klima_csv_path: Optional[str] = None,
     energy_params: Optional[Dict[str, float]] = None,
-    climate_hdd_rhdd: Optional[Tuple[float, float]] = None
+    climate_hdd_rhdd: Optional[Tuple[float, float]] = None,
+    climate_overrides: Optional[Dict[str, float]] = None
 ) -> List[Energie]:
     """
     Erstellt Energie-Instanzen aus einer Liste von Gebaeude-Objekten und berechnet Referenzwerte.
@@ -84,6 +85,10 @@ def create_energie_instanzen_for_gebaeude(
     if climate_hdd_rhdd is not None:
         klima.HDD = float(climate_hdd_rhdd[0])
         klima.RHDD = float(climate_hdd_rhdd[1])
+    if climate_overrides is not None:
+        for key, value in climate_overrides.items():
+            if hasattr(klima, key):
+                setattr(klima, key, float(value))
     energie_instanzen = []
 
     for gebaeude in gebaeude_liste:
@@ -172,7 +177,8 @@ def create_energie_instanzen(
     csv_path: Optional[str] = None,
     klima_csv_path: Optional[str] = None,
     energy_params: Optional[Dict[str, float]] = None,
-    climate_hdd_rhdd: Optional[Tuple[float, float]] = None
+    climate_hdd_rhdd: Optional[Tuple[float, float]] = None,
+    climate_overrides: Optional[Dict[str, float]] = None
 ) -> List[Energie]:
     """
     Erstellt Energie-Instanzen aus den Gebäudetypologie-Daten und berechnet die Referenzwerte.
@@ -182,7 +188,8 @@ def create_energie_instanzen(
         gebaeude_liste=gebaeude_liste,
         klima_csv_path=klima_csv_path,
         energy_params=energy_params,
-        climate_hdd_rhdd=climate_hdd_rhdd
+        climate_hdd_rhdd=climate_hdd_rhdd,
+        climate_overrides=climate_overrides
     )
 
 
