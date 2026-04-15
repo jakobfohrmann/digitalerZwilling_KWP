@@ -131,12 +131,9 @@ def apply_klima_simulation(
 
     # Spalten für Simulation
     for col in ENERGIE_SPALTEN:
-        sim_col = f"{col}_sim"
+        sim_col = f"{col}_sim_klima"
         if sim_col not in gdf.columns:
             gdf[sim_col] = np.nan
-        base_col = f"{col}_base"
-        if base_col not in gdf.columns and col in gdf.columns:
-            gdf[base_col] = gdf[col]
 
     matched_count = 0
     unmatched_count = 0
@@ -203,7 +200,7 @@ def apply_klima_simulation(
                 energie_werte['ga_qH_saniert'] = qh_saniert / bezugsflaeche if pd.notna(bezugsflaeche) and bezugsflaeche > 0 else np.nan
 
         for col, wert in energie_werte.items():
-            gdf.loc[idx, f"{col}_sim"] = wert
+            gdf.loc[idx, f"{col}_sim_klima"] = wert
 
         matched_count += 1
 

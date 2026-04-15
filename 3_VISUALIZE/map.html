@@ -406,6 +406,17 @@
                 <span>Baualtersklasse</span>
             </label>
         </div>
+
+        <div id="spez-scenario-selection" class="sanierung-group" style="display: none; margin-top: -8px;">
+            <label class="sanierung-label" for="spez-scenario-select">Szenario (spez. Wärmebedarf)</label>
+            <select id="spez-scenario-select" class="sanierung-select">
+                <option value="unsaniert">Unsaniert (ga_qH)</option>
+                <option value="groeger_saniert">Saniert nach Groeger-Annahme (ga_qH_saniert)</option>
+                <option value="sim_saniert">Simulation Sanierung (ga_qH_sim_saniert)</option>
+                <option value="sim_klima">Simulation Klima (ga_qH_sim_klima)</option>
+            </select>
+            <div id="spez-scenario-hint" style="font-size: 11px; color: #7f8c8d; margin-top: 6px;"></div>
+        </div>
         
         <h2>Statistik</h2>
         <div class="stats-grid">
@@ -548,6 +559,7 @@
         
         let currentLayer = null;
         let selectedDataFile = null;
+        let activeSpezScenario = 'unsaniert';
         
         // Style-Funktion basierend auf Layer-Typ
         function getStyle(feature, layerType) {
@@ -578,7 +590,8 @@
         
         // Lade Gebäude-Details von API
         function loadBuildingDetails(buildingId, latlng) {
-            fetch(`/api/building/${buildingId}`)
+            const params = new URLSearchParams({ spez_scenario: activeSpezScenario });
+            fetch(`/api/building/${buildingId}?${params.toString()}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.error) {
@@ -591,6 +604,55 @@
                 .catch(error => {
                     console.error('Fehler beim Laden der Gebäudedaten:', error);
                     showPopup(null, latlng);
+                });
+        }
+
+        function updateSpezScenarioVisibility() {
+            const wrapper = document.getElementById('spez-scenario-selection');
+            wrapper.style.display = activeLayerType === 'spez_waermebedarf' ? 'block' : 'none';
+        }
+
+        function refreshSpezScenarioOptions() {
+            return fetch('/api/spez-waermebedarf-scenarios')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    const scenarioSelect = document.getElementById('spez-scenario-select');
+                    const hint = document.getElementById('spez-scenario-hint');
+                    const options = Array.isArray(data.options) ? data.options : [];
+                    const optionMap = {};
+                    options.forEach((item) => {
+                        optionMap[item.id] = item;
+                    });
+
+                    Array.from(scenarioSelect.options).forEach((opt) => {
+                        const meta = optionMap[opt.value];
+                        const isAvailable = !!(meta && meta.available);
+                        opt.disabled = !isAvailable;
+                    });
+
+                    const selectedMeta = optionMap[activeSpezScenario];
+                    if (!selectedMeta || !selectedMeta.available) {
+                        const firstAvailable = options.find((item) => item.available);
+                        activeSpezScenario = firstAvailable ? firstAvailable.id : 'unsaniert';
+                        scenarioSelect.value = activeSpezScenario;
+                    } else {
+                        scenarioSelect.value = activeSpezScenario;
+                    }
+
+                    const disabledOptions = options.filter((item) => !item.available);
+                    if (disabledOptions.length > 0) {
+                        const names = disabledOptions.map((item) => item.label).join(', ');
+                        hint.textContent = `Nicht verfügbar im aktiven Datensatz: ${names}`;
+                    } else {
+                        hint.textContent = '';
+                    }
+                })
+                .catch(error => {
+                    console.error('Fehler beim Laden der Szenario-Optionen:', error);
+                    document.getElementById('spez-scenario-hint').textContent = 'Szenario-Optionen konnten nicht geladen werden.';
                 });
         }
         
@@ -608,8 +670,14 @@
                 if (buildingData.bezugsflaeche !== null && buildingData.bezugsflaeche !== undefined) {
                     content += `<tr><td><strong>Bezugsfläche:</strong></td><td>${buildingData.bezugsflaeche.toFixed(0)} m²</td></tr>`;
                 }
-                if (buildingData.spez_waermebedarf !== null && buildingData.spez_waermebedarf !== undefined) {
-                    content += `<tr style="background: #ecf0f1;"><td><strong>Spez. Wärmebedarf:</strong></td><td><strong>${buildingData.spez_waermebedarf.toFixed(1)} kWh/m²a</strong></td></tr>`;
+                if (buildingData.geschossanzahl !== null && buildingData.geschossanzahl !== undefined) {
+                    content += `<tr><td><strong>Geschossanzahl:</strong></td><td>${buildingData.geschossanzahl}</td></tr>`;
+                }
+                if (buildingData.spez_waermebedarf_unsaniert !== null && buildingData.spez_waermebedarf_unsaniert !== undefined) {
+                    content += `<tr style="background: #f8f9fa;"><td><strong>Spez. Wärmebedarf (unsaniert):</strong></td><td><strong>${buildingData.spez_waermebedarf_unsaniert.toFixed(1)} kWh/m²a</strong></td></tr>`;
+                }
+                if (buildingData.spez_waermebedarf_saniert !== null && buildingData.spez_waermebedarf_saniert !== undefined) {
+                    content += `<tr style="background: #ecf0f1;"><td><strong>Spez. Wärmebedarf (saniert):</strong></td><td><strong>${buildingData.spez_waermebedarf_saniert.toFixed(1)} kWh/m²a</strong></td></tr>`;
                 }
                 if (buildingData.baualtersklasse) {
                     content += `<tr><td><strong>Baualtersklasse:</strong></td><td>${buildingData.baualtersklasse}</td></tr>`;
@@ -630,8 +698,14 @@
         function loadLayer(layerType) {
             const loading = document.getElementById('loading');
             loading.classList.add('active');
-            
-            fetch(`/api/layer/${layerType}`)
+
+            let apiUrl = `/api/layer/${layerType}`;
+            if (layerType === 'spez_waermebedarf') {
+                const params = new URLSearchParams({ spez_scenario: activeSpezScenario });
+                apiUrl = `${apiUrl}?${params.toString()}`;
+            }
+
+            fetch(apiUrl)
                 .then(response => response.json())
                 .then(data => {
                     if (data.error) {
@@ -898,12 +972,14 @@
         
         // Layer-Auswahl über Radio-Buttons in der Sidebar
         let activeLayerType = 'spez_waermebedarf'; // Standard-Layer
+        updateSpezScenarioVisibility();
         
         // Event-Handler für Radio-Button-Auswahl
         document.querySelectorAll('#layer-selection input[type="radio"]').forEach(radio => {
             radio.addEventListener('change', function() {
                 if (this.checked) {
                     activeLayerType = this.value;
+                    updateSpezScenarioVisibility();
                     loadLayer(activeLayerType);
                 }
             });
@@ -916,8 +992,10 @@
                 if (initialFile) {
                     selectDataFile(initialFile).then((ok) => {
                         if (ok) {
-                            loadLayer(activeLayerType);
-                            loadStats();
+                            refreshSpezScenarioOptions().then(() => {
+                                loadLayer(activeLayerType);
+                                loadStats();
+                            });
                         }
                     });
                 }
@@ -926,7 +1004,8 @@
         
         // Lade Statistiken
         function loadStats() {
-            fetch('/api/stats')
+            const params = new URLSearchParams({ spez_scenario: activeSpezScenario });
+            fetch(`/api/stats?${params.toString()}`)
                 .then(response => response.json())
                 .then(stats => {
                     document.getElementById('stat-buildings').textContent = stats.total_buildings || '-';
@@ -1088,7 +1167,7 @@
                     loadLayer(activeLayerType);
                 }
                 loadStats();
-                loadAvailableDataFiles();
+                loadAvailableDataFiles().then(() => refreshSpezScenarioOptions());
                 alert(`Sanierung erfolgreich!\n\nKandidaten: ${data.statistics.candidates}\nAngewandt: ${data.statistics.applied}\nNicht zugeordnet: ${data.statistics.unmatched}`);
             })
             .catch(error => {
@@ -1212,7 +1291,7 @@
                     loadLayer(activeLayerType);
                 }
                 loadStats();
-                loadAvailableDataFiles();
+                loadAvailableDataFiles().then(() => refreshSpezScenarioOptions());
                 alert(
                     `Klima-Simulation erfolgreich!\n\n` +
                     `HDD: ${data.statistics.hdd.toFixed(2)}\n` +
@@ -1240,6 +1319,13 @@
 
         document.getElementById('klima-simulate-btn').addEventListener('click', runKlimaSimulation);
         document.getElementById('klima-scenario').addEventListener('change', populateKlimaYears);
+        document.getElementById('spez-scenario-select').addEventListener('change', function() {
+            activeSpezScenario = this.value;
+            if (activeLayerType === 'spez_waermebedarf') {
+                loadLayer(activeLayerType);
+            }
+            loadStats();
+        });
         document.getElementById('data-file-select').addEventListener('change', function() {
             const filename = this.value;
             if (!filename || filename === selectedDataFile) {
@@ -1247,8 +1333,10 @@
             }
             selectDataFile(filename).then((ok) => {
                 if (ok) {
-                    loadLayer(activeLayerType);
-                    loadStats();
+                    refreshSpezScenarioOptions().then(() => {
+                        loadLayer(activeLayerType);
+                        loadStats();
+                    });
                 }
             });
         });

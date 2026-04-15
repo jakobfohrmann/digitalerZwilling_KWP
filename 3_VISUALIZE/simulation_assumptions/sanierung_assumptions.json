@@ -81,5 +81,16 @@
             "fenster",
             "tuer"
         ]
+    },
+    {
+        "id": "aa382bf8-adcc-4605-86b2-bf43d7b5a500",
+        "name": "wirklich vollständige Sanierung alle Gebäudetypen",
+        "density": 100.0,
+        "cycle": "2009",
+        "depth": "teilsaniert",
+        "building_types": [],
+        "baujahr_from": 1900,
+        "baujahr_to": 1980,
+        "custom_parts": []
     }
 ]

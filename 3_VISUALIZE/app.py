@@ -332,6 +332,85 @@ app = Flask(__name__, template_folder=os.path.dirname(os.path.abspath(__file__))
 buildings_data = None
 current_data_filename: Optional[str] = None
 
+SPEZ_SCENARIO_COLUMN_MAP = {
+    'unsaniert': 'ga_qH',
+    'groeger_saniert': 'ga_qH_saniert',
+    'sim_saniert': 'ga_qH_sim_saniert',
+    'sim_klima': 'ga_qH_sim_klima',
+}
+
+SPEZ_SCENARIO_LABELS = {
+    'unsaniert': 'Unsaniert',
+    'groeger_saniert': 'Saniert nach Groeger-Annahme',
+    'sim_saniert': 'Simulation Sanierung',
+    'sim_klima': 'Simulation Klima',
+}
+
+SIM_FILENAME_SUFFIXES = [
+    ('_mit_klima', 'klima'),
+    ('_mit_sanierung', 'sanierung'),
+    ('_mit_energiebilanz', None),
+]
+
+SIM_FILENAME_ORDER = ['klima', 'sanierung']
+
+
+def normalize_spez_scenario(scenario: Optional[str]) -> str:
+    scenario_key = str(scenario or '').strip().lower()
+    return scenario_key if scenario_key in SPEZ_SCENARIO_COLUMN_MAP else 'unsaniert'
+
+
+def get_spez_waermebedarf_value(record: Dict, scenario: Optional[str]):
+    scenario_key = normalize_spez_scenario(scenario)
+    col_name = SPEZ_SCENARIO_COLUMN_MAP[scenario_key]
+    value = record.get(col_name)
+    return value if pd.notna(value) else np.nan
+
+
+def get_spez_scenario_availability(gdf: gpd.GeoDataFrame) -> List[Dict]:
+    options = []
+    for scenario_id, col_name in SPEZ_SCENARIO_COLUMN_MAP.items():
+        has_column = col_name in gdf.columns
+        has_values = bool(has_column and gdf[col_name].notna().any())
+        options.append({
+            'id': scenario_id,
+            'label': SPEZ_SCENARIO_LABELS[scenario_id],
+            'column': col_name,
+            'available': has_values,
+            'reason': None if has_values else f'Spalte {col_name} fehlt oder enthält keine Werte'
+        })
+    return options
+
+
+def build_simulation_output_filename(input_filename: str, simulation_tag: str) -> str:
+    """
+    Baut einen stabilen Ausgabedateinamen für Simulationsergebnisse.
+    - entfernt '_mit_energiebilanz'
+    - kombiniert '_mit_klima' und '_mit_sanierung' ohne gegenseitiges Überschreiben
+    - erzwingt stabile Reihenfolge: '_mit_klima_mit_sanierung'
+    """
+    base_name = os.path.splitext(input_filename)[0]
+    tags = set()
+
+    # Entferne bekannte Suffixe vom Ende (auch mehrfach verkettet möglich).
+    while True:
+        matched = False
+        for suffix, tag in SIM_FILENAME_SUFFIXES:
+            if base_name.endswith(suffix):
+                base_name = base_name[:-len(suffix)]
+                if tag is not None:
+                    tags.add(tag)
+                matched = True
+                break
+        if not matched:
+            break
+
+    if simulation_tag in SIM_FILENAME_ORDER:
+        tags.add(simulation_tag)
+
+    combined_suffix = ''.join(f"_mit_{tag}" for tag in SIM_FILENAME_ORDER if tag in tags)
+    return f"{base_name}{combined_suffix}.gpkg"
+
 
 def load_data(input_filename: Optional[str] = None) -> gpd.GeoDataFrame:
     """Lädt Gebäude-GPKG aus 2_COMPUTE/computing_outputs/ (Ordnerinhalt, kein fester Name)."""
@@ -355,7 +434,27 @@ def load_data(input_filename: Optional[str] = None) -> gpd.GeoDataFrame:
     return gdf
 
 
-def prepare_geojson_for_layer(gdf: gpd.GeoDataFrame, layer_type: str) -> Dict:
+def get_preferred_sim_value(record: Dict, base_col: str):
+    """
+    Liefert bevorzugten Simulationswert:
+    1) Klima-Simulation, 2) Sanierungs-Simulation, 3) Basiswert.
+    """
+    klima_col = f"{base_col}_sim_klima"
+    saniert_col = f"{base_col}_sim_saniert"
+    klima_value = record.get(klima_col)
+    if pd.notna(klima_value):
+        return klima_value
+    saniert_value = record.get(saniert_col)
+    if pd.notna(saniert_value):
+        return saniert_value
+    return record.get(base_col)
+
+
+def prepare_geojson_for_layer(
+    gdf: gpd.GeoDataFrame,
+    layer_type: str,
+    spez_scenario: str = 'unsaniert'
+) -> Dict:
     """
     Bereitet GeoJSON für einen bestimmten Layer vor.
     
@@ -380,17 +479,17 @@ def prepare_geojson_for_layer(gdf: gpd.GeoDataFrame, layer_type: str) -> Dict:
         
         if layer_type == 'waermebedarf':
             # Wärmebedarf [kWh/a]
-            value = props.get('g_QH_sim')
-            if value is None:
-                value = props.get('g_QH') or 0
+            value = get_preferred_sim_value(props, 'g_QH')
+            if pd.isna(value):
+                value = 0
             feature['properties']['_layer_value'] = value
             feature['properties']['_layer_color'] = get_color_for_waermebedarf(value, is_spezific=False)
         
         elif layer_type == 'spez_waermebedarf':
             # Spezifischer Wärmebedarf [kWh/m²a]
-            value = props.get('ga_qH_sim')
-            if value is None:
-                value = props.get('ga_qH') or 0
+            value = get_spez_waermebedarf_value(props, spez_scenario)
+            if pd.isna(value):
+                value = 0
             feature['properties']['_layer_value'] = value
             feature['properties']['_layer_color'] = get_color_for_waermebedarf(value, is_spezific=True)
         
@@ -465,9 +564,25 @@ def get_layer(layer_type: str):
         if layer_type not in valid_layers:
             return jsonify({'error': f'Ungültiger Layer-Typ. Erlaubt: {valid_layers}'}), 400
         
-        geojson = prepare_geojson_for_layer(buildings_data, layer_type)
+        spez_scenario = normalize_spez_scenario(request.args.get('spez_scenario'))
+        geojson = prepare_geojson_for_layer(buildings_data, layer_type, spez_scenario=spez_scenario)
         return jsonify(geojson)
     
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/spez-waermebedarf-scenarios', methods=['GET'])
+def get_spez_waermebedarf_scenarios():
+    """Liefert verfügbare Szenario-Optionen für spezifischen Wärmebedarf."""
+    try:
+        if buildings_data is None:
+            load_data()
+        options = get_spez_scenario_availability(buildings_data)
+        return jsonify({
+            'options': options,
+            'default': 'unsaniert'
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -550,14 +665,33 @@ def get_building(building_id: str):
         
         # Konvertiere zu Dictionary
         building_row = building.iloc[0]
-        ga_qh_sim = building_row.get('ga_qH_sim') if 'ga_qH_sim' in building_row else None
-        g_qh_sim = building_row.get('g_QH_sim') if 'g_QH_sim' in building_row else None
+        spez_scenario = normalize_spez_scenario(request.args.get('spez_scenario'))
+        ga_qh_sim = get_spez_waermebedarf_value(building_row, spez_scenario)
+        g_qh_sim = get_preferred_sim_value(building_row, 'g_QH')
+        ga_qh_unsaniert = building_row.get('ga_qH')
+        ga_qh_saniert = building_row.get('ga_qH_saniert')
+
+        geschossanzahl = None
+        for col in ['anzahl_geschosse', 'anzahlDOberirdischenGeschosse', 'anzahl_oberirdische_geschosse']:
+            if col not in building_row:
+                continue
+            raw_val = building_row.get(col)
+            if pd.notna(raw_val):
+                try:
+                    val = float(raw_val)
+                    geschossanzahl = int(round(val)) if abs(val - round(val)) < 1e-6 else val
+                    break
+                except (TypeError, ValueError):
+                    continue
 
         building_dict = {
             'id': str(building_row.get(id_col, '')),
             'baujahr': int(building_row['baujahr']) if pd.notna(building_row.get('baujahr')) else None,
             'gebaeudetyp': str(building_row['gebaeudetyp']) if pd.notna(building_row.get('gebaeudetyp')) else None,
             'bezugsflaeche': float(building_row['bezugsflaeche']) if pd.notna(building_row.get('bezugsflaeche')) else None,
+            'geschossanzahl': geschossanzahl,
+            'spez_waermebedarf_unsaniert': float(ga_qh_unsaniert) if pd.notna(ga_qh_unsaniert) else None,
+            'spez_waermebedarf_saniert': float(ga_qh_saniert) if pd.notna(ga_qh_saniert) else None,
             'spez_waermebedarf': float(ga_qh_sim) if pd.notna(ga_qh_sim) else (
                 float(building_row['ga_qH']) if pd.notna(building_row.get('ga_qH')) else None
             ),
@@ -637,17 +771,22 @@ def get_stats():
             stats['total_area'] = float(buildings_data['bezugsflaeche'].sum())
         
         # Wärmebedarf
-        if 'g_QH_sim' in buildings_data.columns and buildings_data['g_QH_sim'].notna().any():
-            stats['waermebedarf_total'] = float(buildings_data['g_QH_sim'].sum())
-            stats['waermebedarf_mean'] = float(buildings_data['g_QH_sim'].mean())
+        if 'g_QH_sim_klima' in buildings_data.columns and buildings_data['g_QH_sim_klima'].notna().any():
+            stats['waermebedarf_total'] = float(buildings_data['g_QH_sim_klima'].sum())
+            stats['waermebedarf_mean'] = float(buildings_data['g_QH_sim_klima'].mean())
+        elif 'g_QH_sim_saniert' in buildings_data.columns and buildings_data['g_QH_sim_saniert'].notna().any():
+            stats['waermebedarf_total'] = float(buildings_data['g_QH_sim_saniert'].sum())
+            stats['waermebedarf_mean'] = float(buildings_data['g_QH_sim_saniert'].mean())
         elif 'g_QH' in buildings_data.columns:
             stats['waermebedarf_total'] = float(buildings_data['g_QH'].sum())
             stats['waermebedarf_mean'] = float(buildings_data['g_QH'].mean())
         
-        # Spezifischer Wärmebedarf
-        if 'ga_qH_sim' in buildings_data.columns and buildings_data['ga_qH_sim'].notna().any():
-            stats['spez_waermebedarf_mean'] = float(buildings_data['ga_qH_sim'].mean())
-        elif 'ga_qH' in buildings_data.columns:
+        # Spezifischer Wärmebedarf (explizites Szenario)
+        spez_scenario = normalize_spez_scenario(request.args.get('spez_scenario'))
+        spez_col = SPEZ_SCENARIO_COLUMN_MAP[spez_scenario]
+        if spez_col in buildings_data.columns and buildings_data[spez_col].notna().any():
+            stats['spez_waermebedarf_mean'] = float(buildings_data[spez_col].mean())
+        elif 'ga_qH' in buildings_data.columns and buildings_data['ga_qH'].notna().any():
             stats['spez_waermebedarf_mean'] = float(buildings_data['ga_qH'].mean())
         
         # Gebäudetypen
@@ -782,10 +921,7 @@ def sanierung_simulate():
         gdf, stats = apply_sanierung_simulation(gdf, assumption, energy_params=energy_parameters)
 
         # Speichere Ergebnis
-        base_name = os.path.splitext(input_filename)[0]
-        if base_name.endswith('_mit_energiebilanz'):
-            base_name = base_name.replace('_mit_energiebilanz', '')
-        output_filename = f'{base_name}_mit_sanierung.gpkg'
+        output_filename = build_simulation_output_filename(input_filename, simulation_tag='sanierung')
         os.makedirs(COMPUTE_OUTPUTS, exist_ok=True)
         output_path = os.path.join(str(COMPUTE_OUTPUTS), output_filename)
         gdf.to_file(output_path, driver='GPKG')
@@ -869,11 +1005,7 @@ def klima_simulate():
         )
 
         # Speichere Ergebnis
-        base_name = os.path.splitext(input_filename)[0]
-        for suffix in ['_mit_energiebilanz', '_mit_sanierung', '_mit_klima']:
-            if base_name.endswith(suffix):
-                base_name = base_name.replace(suffix, '')
-        output_filename = f'{base_name}_mit_klima.gpkg'
+        output_filename = build_simulation_output_filename(input_filename, simulation_tag='klima')
         os.makedirs(COMPUTE_OUTPUTS, exist_ok=True)
         output_path = os.path.join(str(COMPUTE_OUTPUTS), output_filename)
         gdf.to_file(output_path, driver='GPKG')

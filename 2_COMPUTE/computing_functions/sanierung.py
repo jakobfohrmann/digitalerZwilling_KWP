@@ -371,12 +371,9 @@ def apply_sanierung_simulation(
 
     # Spalten für Simulation
     for col in ENERGIE_SPALTEN:
-        sim_col = f"{col}_sim"
+        sim_col = f"{col}_sim_saniert"
         if sim_col not in gdf.columns:
             gdf[sim_col] = np.nan
-        base_col = f"{col}_base"
-        if base_col not in gdf.columns and col in gdf.columns:
-            gdf[base_col] = gdf[col]
 
     if 'sanierung_kandidat' not in gdf.columns:
         gdf['sanierung_kandidat'] = False
@@ -506,7 +503,7 @@ def apply_sanierung_simulation(
         energie_werte = scale_energie_values(energie_ref, bezugsflaeche, ref_gebaeude.AN)
 
         for col, wert in energie_werte.items():
-            gdf.loc[idx, f"{col}_sim"] = wert
+            gdf.loc[idx, f"{col}_sim_saniert"] = wert
 
         if use_renov:
             applied_count += 1
