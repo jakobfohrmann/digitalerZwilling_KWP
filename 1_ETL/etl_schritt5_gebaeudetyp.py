@@ -5,7 +5,7 @@ ETL-Schritt 5: Gebäudetyp (Wohn: EFH, RH, MFH, GMH, HH).
 Nutzt ausschließlich die in **Schritt 3** berechneten Spalten (plus Geometrie für die Fußabdruckfläche):
 
 - ``trauf_hoehe_m``, ``dach_hoehe_m``
-- ``bezugsflaeche`` (Fußabdruckfläche × ``geschoss_hoehe_m``-Kennzahl, m³)
+- ``bezugsflaeche`` (Fußabdruckfläche × ``anzahl_geschosse`` × 0.85, Kenngröße)
 - ``anzahl_geschosse`` (geschätzte oberirdische Geschosse aus Schritt 3)
 
 Die Höhen-Regeln (MFH/GMH/HH) verwenden ``trauf_hoehe_m + dach_hoehe_m`` als Objekthöhen-Proxy;

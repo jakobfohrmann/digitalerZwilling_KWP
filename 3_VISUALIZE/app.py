@@ -84,6 +84,13 @@ def pick_gpkg_from_outputs(explicit_basename: Optional[str] = None) -> Tuple[str
     return str(chosen.resolve()), chosen.name
 
 
+def list_gpkg_in_outputs() -> List[str]:
+    """Liefert alle .gpkg-Dateien aus COMPUTE_OUTPUTS (neueste zuerst)."""
+    out_dir = Path(COMPUTE_OUTPUTS)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    return [p.name for p in sorted(out_dir.glob("*.gpkg"), key=lambda p: p.stat().st_mtime, reverse=True)]
+
+
 def get_klima_assumptions_path() -> str:
     """Zielpfad für Klimaannahmen (simulation_assumptions/)."""
     os.makedirs(SIMULATION_ASSUMPTIONS_DIR, exist_ok=True)
@@ -161,6 +168,28 @@ def normalize_klima_assumption(data: Dict) -> Tuple[Optional[Dict], Optional[str
         'scenario': scenario,
         'year': year
     }, None
+
+
+def _assumption_payload_without_id(assumption: Dict) -> Dict:
+    """Erstellt einen kanonischen Vergleichs-Payload ohne ID-Feld."""
+    return {k: assumption.get(k) for k in sorted(assumption.keys()) if k != 'id'}
+
+
+def _find_exact_duplicate_assumption(
+    assumptions: List[Dict],
+    candidate: Dict,
+    exclude_id: Optional[str] = None
+) -> Optional[Dict]:
+    """
+    Sucht eine exakte Duplikat-Annahme (gleicher Payload, ID ignoriert).
+    """
+    candidate_payload = _assumption_payload_without_id(candidate)
+    for item in assumptions:
+        if exclude_id is not None and item.get('id') == exclude_id:
+            continue
+        if _assumption_payload_without_id(item) == candidate_payload:
+            return item
+    return None
 
 
 def add_energiebilanz_to_gebaeude(gdf: gpd.GeoDataFrame, energy_params: Optional[Dict[str, float]] = None) -> gpd.GeoDataFrame:
@@ -443,6 +472,46 @@ def get_layer(layer_type: str):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/data-files', methods=['GET'])
+def get_data_files():
+    """API Endpoint für verfügbare GPKG-Dateien in computing_outputs."""
+    try:
+        files = list_gpkg_in_outputs()
+        if not files:
+            return jsonify({
+                'files': [],
+                'current_file': current_data_filename,
+                'error': 'Keine .gpkg in computing_outputs gefunden'
+            }), 404
+
+        return jsonify({
+            'files': files,
+            'current_file': current_data_filename or files[0]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/data-select', methods=['POST'])
+def select_data_file():
+    """API Endpoint zum aktiven Umschalten der geladenen GPKG-Datei."""
+    try:
+        data = request.json or {}
+        filename = str(data.get('filename', '')).strip()
+        if not filename:
+            return jsonify({'error': 'Dateiname fehlt'}), 400
+
+        load_data(input_filename=filename)
+        return jsonify({
+            'message': 'Datensatz erfolgreich geladen',
+            'current_file': current_data_filename
+        })
+    except FileNotFoundError as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/building/<building_id>')
 def get_building(building_id: str):
     """
@@ -611,8 +680,10 @@ def sanierung_assumptions():
     assumption_id = normalized.get('id') or str(uuid.uuid4())
     normalized['id'] = assumption_id
 
+    duplicate = _find_exact_duplicate_assumption(assumptions, normalized, exclude_id=assumption_id)
     assumptions = [a for a in assumptions if a.get('id') != assumption_id]
-    assumptions.append(normalized)
+    if duplicate is None:
+        assumptions.append(normalized)
 
     if not save_sanierung_assumptions(assumptions):
         return jsonify({'error': 'Sanierungsannahme konnte nicht gespeichert werden'}), 500
@@ -636,8 +707,10 @@ def klima_assumptions():
     assumption_id = normalized.get('id') or str(uuid.uuid4())
     normalized['id'] = assumption_id
 
+    duplicate = _find_exact_duplicate_assumption(assumptions, normalized, exclude_id=assumption_id)
     assumptions = [a for a in assumptions if a.get('id') != assumption_id]
-    assumptions.append(normalized)
+    if duplicate is None:
+        assumptions.append(normalized)
 
     if not save_klima_assumptions(assumptions):
         return jsonify({'error': 'Klimaannahme konnte nicht gespeichert werden'}), 500
@@ -697,8 +770,12 @@ def sanierung_simulate():
             assumptions = load_sanierung_assumptions()
             assumption_id = assumption.get('id') or str(uuid.uuid4())
             assumption['id'] = assumption_id
+            duplicate = _find_exact_duplicate_assumption(assumptions, assumption, exclude_id=assumption_id)
             assumptions = [a for a in assumptions if a.get('id') != assumption_id]
-            assumptions.append(assumption)
+            if duplicate is None:
+                assumptions.append(assumption)
+            else:
+                assumption = duplicate
             save_sanierung_assumptions(assumptions)
 
         # Sanierung anwenden
@@ -775,8 +852,12 @@ def klima_simulate():
             assumptions = load_klima_assumptions()
             assumption_id = assumption.get('id') or str(uuid.uuid4())
             assumption['id'] = assumption_id
+            duplicate = _find_exact_duplicate_assumption(assumptions, assumption, exclude_id=assumption_id)
             assumptions = [a for a in assumptions if a.get('id') != assumption_id]
-            assumptions.append(assumption)
+            if duplicate is None:
+                assumptions.append(assumption)
+            else:
+                assumption = duplicate
             save_klima_assumptions(assumptions)
 
         # Klima anwenden

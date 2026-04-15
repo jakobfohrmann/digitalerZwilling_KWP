@@ -110,9 +110,8 @@ Skript: **`etl_schritt3_hoehe_flaeche_geschosse.py`**
 - **Eingaben:** `lod1_measuredHeight_m`, `lod1_Dachneigung`, optional `lod1_roofType`; plus **Gebäudegeometrie** (Fußabdruck, für Trauf-/Dachmodell und Flächen).
 - **Neue Spalten:**
   - **`dach_hoehe_m`**, **`trauf_hoehe_m`** — vereinfachtes Satteldach bzw. Flachdach (siehe Docstring im Skript).
-  - **`geschoss_hoehe_m`** — grobe Kennzahl: ganzzahliger Anteil `trauf_hoehe_m // 3` (Meter).
-  - **`bezugsflaeche`** — **größtes Polygon** der Geometrie (Fußabdruckfläche in m² im CRS) × **`geschoss_hoehe_m`** × **0.85** (Kenngröße in m³); dient als einheitliche Bezugsgröße für spätere Auswertungen.
   - **`anzahl_geschosse`** — geschätzte **Anzahl oberirdischer Geschosse** aus `trauf_hoehe_m` (Annahme ~3 m Geschosshöhe, siehe Docstring); wird in **ETL-Schritt 5** für die Gebäudetyp-Regeln genutzt.
+  - **`bezugsflaeche`** — **größtes Polygon** der Geometrie (Fußabdruckfläche in m² im CRS) × **`anzahl_geschosse`** × **0.85** (Kenngröße); dient als einheitliche Bezugsgröße für spätere Auswertungen.
 - **Eingabe-Datei:** Standard: erste `*_schritt2.gpkg` unter `output/output_step2/` (alternativ Pfad als Argument).
 - **Ausgabe:** `output/output_step3/<Basis>_schritt3.gpkg`.
 

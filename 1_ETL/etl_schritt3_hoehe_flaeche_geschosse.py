@@ -11,9 +11,8 @@ Annahmen (vereinfachtes Satteldach-Modell, EPSG:25833 = Meter):
 - Klassifikation **zuerst** über numerischen ``lod1_roofType``-Code (wenn parsebar): 1000 = Flachdach → dach_hoehe_m = 0, trauf_hoehe_m = Höhe (Neigung wird ignoriert).
 - Anderer bekannter Code (≠ 1000) → geneigtes Dachmodell aus Neigung + MBR (der Code hat Vorrang vor Neigungs-Heuristik).
 - Ohne parsebaren ``lod1_roofType``-Code: nur noch Neigung < 0,5° als Flachdach-Näherung → dach_hoehe_m = 0, trauf_hoehe_m = Höhe; sonst Satteldach-Formel.
-- geschoss_hoehe_m (grobe Annahme): ganzzahliger Anteil von trauf_hoehe_m / 3 (// 3, in Meter) — Kennzahl für ``bezugsflaeche``.
-- anzahl_geschosse — geschätzte **Anzahl oberirdischer Geschosse** aus ``trauf_hoehe_m`` (Annahme ~3 m Geschosshöhe: ``round(trauf/3)``, mindestens 1 bei trauf > 0); für **ETL-Schritt 5** (Gebäudetyp).
-- bezugsflaeche = **georeferenzierte Fußabdruckfläche** (größtes Polygon, m²) × **geschoss_hoehe_m** (m³).
+- anzahl_geschosse — geschätzte **Anzahl oberirdischer Geschosse** aus ``trauf_hoehe_m`` (Annahme ~3 m Geschosshöhe: ``round(trauf/3)``, mindestens 1 bei trauf > 0).
+- bezugsflaeche = **georeferenzierte Fußabdruckfläche** (größtes Polygon, m²) × **anzahl_geschosse** × 0.85 (Kenngröße für Folge-Rechnungen).
 
 Ausgabe: output/output_step3/<Basis>_schritt3.gpkg
 
@@ -48,7 +47,7 @@ ROOFTYPE_FLACHDACH = 1000
 # Dachhöhen-Plausibilisierung
 MAX_DACHHOEHE_M = 10.0
 MAX_DACHANTEIL = 1.0 / 3.0
-# Schätzung der Geschosszahl aus Traufhöhe (konsistent mit //3 bei geschoss_hoehe_m)
+# Schätzung der Geschosszahl aus Traufhöhe
 GESCHOSS_HOEHE_ANNAHME_M = 3.0
 
 
@@ -272,7 +271,6 @@ def main() -> int:
 
     dach_list: list[float | None] = []
     trauf_list: list[float | None] = []
-    geschoss_list: list[float | None] = []
     anzahl_geschosse_list: list[float | None] = []
     bezugs_list: list[float | None] = []
 
@@ -285,28 +283,24 @@ def main() -> int:
         dach_list.append(dach)
         trauf_list.append(trauf)
         if trauf is None or (isinstance(trauf, float) and math.isnan(trauf)):
-            geschoss_val = None
             anzahl_g = None
         else:
             tf = float(trauf)
-            geschoss_val = float(int(tf // 3))
             if tf > 0:
                 anzahl_g = max(1, int(round(tf / GESCHOSS_HOEHE_ANNAHME_M)))
             else:
                 anzahl_g = 0
-        geschoss_list.append(geschoss_val)
         anzahl_geschosse_list.append(float(anzahl_g) if anzahl_g is not None else float("nan"))
 
         g_fp = _largest_polygon(geom)
-        if geschoss_val is not None and g_fp is not None and not g_fp.is_empty:
-            bezugs_list.append(float(g_fp.area) * geschoss_val*0.85)
+        if anzahl_g is not None and g_fp is not None and not g_fp.is_empty:
+            bezugs_list.append(float(g_fp.area) * float(anzahl_g) * 0.85)
         else:
             bezugs_list.append(float("nan"))
 
     gdf = gdf.copy()
     gdf["dach_hoehe_m"] = dach_list
     gdf["trauf_hoehe_m"] = trauf_list
-    gdf["geschoss_hoehe_m"] = geschoss_list
     gdf[COL_ANZAHL_GESCHOSSE] = anzahl_geschosse_list
     gdf[COL_BEZUGS] = bezugs_list
 

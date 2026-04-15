@@ -10,14 +10,14 @@ import pandas as pd
 
 ENERGIE_SPALTEN: List[str] = [
     'c_QT',
-    'c0_QT',
+    'c_QT_saniert',
     'd_QL',
-    'd0_QL',
     'e_QS',
     'f_QI',
     'g_QH',
+    'g_QH_saniert',
     'ga_qH',
-    'ga0_qH',
+    'ga_qH_saniert',
 ]
 
 
@@ -102,12 +102,12 @@ def scale_energie_values(
 
     return {
         'c_QT': energie_ref.c_QT * scale_factor,
-        'c0_QT': energie_ref.c0_QT * scale_factor,
+        'c_QT_saniert': energie_ref.c_QT_saniert * scale_factor,
         'd_QL': energie_ref.d_QL * scale_factor,
-        'd0_QL': energie_ref.d0_QL * scale_factor,
         'e_QS': energie_ref.e_QS * scale_factor,
         'f_QI': energie_ref.f_QI * scale_factor,
         'g_QH': energie_ref.g_QH * scale_factor,
+        'g_QH_saniert': energie_ref.g_QH_saniert * scale_factor,
         'ga_qH': energie_ref.ga_qH,
-        'ga0_qH': energie_ref.ga0_qH,
+        'ga_qH_saniert': energie_ref.ga_qH_saniert,
     }

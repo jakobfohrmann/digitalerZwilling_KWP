@@ -7,7 +7,6 @@ import pandas as pd
 import numpy as np
 import os
 import json
-import random
 from dataclasses import replace
 from typing import Optional, Dict, Set, List, Tuple
 from gebaeudetypologie_loader import Gebaeude
@@ -384,7 +383,6 @@ def apply_sanierung_simulation(
     if 'sanierung_angewandt' not in gdf.columns:
         gdf['sanierung_angewandt'] = False
 
-    rng = random.Random(assumption.get('seed'))
     matched_count = 0
     applied_count = 0
     unmatched_count = 0
@@ -396,6 +394,35 @@ def apply_sanierung_simulation(
             if (typ_candidate, bal) in default_gebaeude_map:
                 return typ_candidate
         return None
+
+    def get_specific_heat_demand(row: pd.Series) -> float:
+        """
+        Liefert einen Ranking-Wert für die Priorisierung.
+        Höherer Wert = höherer Sanierungsbedarf.
+        """
+        ga_qh = row.get('ga_qH')
+        if pd.notna(ga_qh):
+            try:
+                return float(ga_qh)
+            except (ValueError, TypeError):
+                pass
+
+        g_qh = row.get('g_QH')
+        bezugsflaeche = row.get('bezugsflaeche')
+        if pd.notna(g_qh) and pd.notna(bezugsflaeche):
+            try:
+                bezugsflaeche_float = float(bezugsflaeche)
+                if bezugsflaeche_float > 0:
+                    return float(g_qh) / bezugsflaeche_float
+            except (ValueError, TypeError, ZeroDivisionError):
+                pass
+
+        return float('-inf')
+
+    # Schritt 1: Kandidaten bestimmen und Ranking-Daten vorbereiten
+    row_context: List[Dict] = []
+    candidate_rankings: List[Tuple[int, float, int]] = []
+    ranking_order = 0
 
     for idx, row in gdf.iterrows():
         gebaeudetyp = row.get('gebaeudetyp')
@@ -426,21 +453,61 @@ def apply_sanierung_simulation(
 
         if energie_default is None or ref_gebaeude is None:
             unmatched_count += 1
+            row_context.append({
+                'idx': idx,
+                'bezugsflaeche': bezugsflaeche,
+                'is_candidate': bool(is_candidate),
+                'eligible_for_sanierung': False,
+                'energie_default': None,
+                'energie_renov': None,
+                'ref_gebaeude': None
+            })
             continue
 
-        use_renov = False
-        if is_candidate and energie_renov is not None:
-            if rng.random() <= density:
-                use_renov = True
+        if is_candidate:
+            matched_count += 1
 
+        eligible_for_sanierung = bool(is_candidate and energie_renov is not None)
+        if eligible_for_sanierung:
+            score = get_specific_heat_demand(row)
+            candidate_rankings.append((idx, score, ranking_order))
+            ranking_order += 1
+
+        row_context.append({
+            'idx': idx,
+            'bezugsflaeche': bezugsflaeche,
+            'is_candidate': bool(is_candidate),
+            'eligible_for_sanierung': eligible_for_sanierung,
+            'energie_default': energie_default,
+            'energie_renov': energie_renov,
+            'ref_gebaeude': ref_gebaeude
+        })
+
+    # Schritt 2: Zielanzahl bestimmen und Top-Kandidaten auswählen
+    target_count = int(round(len(candidate_rankings) * density))
+    target_count = max(0, min(target_count, len(candidate_rankings)))
+    candidate_rankings.sort(key=lambda item: (-item[1], item[2]))
+    selected_for_sanierung = {idx for idx, _score, _order in candidate_rankings[:target_count]}
+
+    # Schritt 3: Energiewerte berechnen und Sanierung anwenden
+    for context in row_context:
+        idx = context['idx']
+        bezugsflaeche = context['bezugsflaeche']
+        energie_default = context['energie_default']
+        energie_renov = context['energie_renov']
+        ref_gebaeude = context['ref_gebaeude']
+
+        if energie_default is None or ref_gebaeude is None:
+            gdf.loc[idx, 'sanierung_angewandt'] = False
+            continue
+
+        use_renov = bool(context['eligible_for_sanierung'] and idx in selected_for_sanierung)
         energie_ref = energie_renov if use_renov else energie_default
         energie_werte = scale_energie_values(energie_ref, bezugsflaeche, ref_gebaeude.AN)
 
         for col, wert in energie_werte.items():
             gdf.loc[idx, f"{col}_sim"] = wert
 
-        if is_candidate:
-            matched_count += 1
         if use_renov:
             applied_count += 1
         gdf.loc[idx, 'sanierung_angewandt'] = bool(use_renov)

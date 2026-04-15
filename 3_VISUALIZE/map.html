@@ -85,6 +85,37 @@
             flex: 1;
             height: 100vh;
         }
+
+        #data-file-selector {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1200;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid #b8d4e3;
+            border-radius: 8px;
+            padding: 10px 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+            min-width: 280px;
+        }
+
+        #data-file-selector label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #2c5f8f;
+            margin-bottom: 6px;
+        }
+
+        #data-file-select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 12px;
+            background: white;
+            color: #2c3e50;
+        }
         
         /* Loading Overlay */
         .loading {
@@ -476,6 +507,11 @@
     
     <!-- Map Container -->
     <div id="map"></div>
+
+    <div id="data-file-selector">
+        <label for="data-file-select">Aktiver Layer-Datensatz (GPKG)</label>
+        <select id="data-file-select"></select>
+    </div>
     
     <!-- Legend Container - Fixed in bottom left corner -->
     <div id="legend-container" class="legend">
@@ -511,6 +547,7 @@
         };
         
         let currentLayer = null;
+        let selectedDataFile = null;
         
         // Style-Funktion basierend auf Layer-Typ
         function getStyle(feature, layerType) {
@@ -629,6 +666,77 @@
                     console.error('Fehler beim Laden des Layers:', error);
                     alert('Fehler beim Laden des Layers: ' + error);
                     loading.classList.remove('active');
+                });
+        }
+
+        function populateDataFileSelect(files, currentFile) {
+            const select = document.getElementById('data-file-select');
+            select.innerHTML = '';
+
+            files.forEach((file) => {
+                const option = document.createElement('option');
+                option.value = file;
+                option.textContent = file;
+                select.appendChild(option);
+            });
+
+            if (files.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'Keine .gpkg gefunden';
+                select.appendChild(option);
+                select.disabled = true;
+                selectedDataFile = null;
+                return;
+            }
+
+            select.disabled = false;
+            const effectiveCurrent = files.includes(currentFile) ? currentFile : files[0];
+            select.value = effectiveCurrent;
+            selectedDataFile = effectiveCurrent;
+        }
+
+        function loadAvailableDataFiles() {
+            return fetch('/api/data-files')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error && !Array.isArray(data.files)) {
+                        throw new Error(data.error);
+                    }
+                    const files = Array.isArray(data.files) ? data.files : [];
+                    populateDataFileSelect(files, data.current_file);
+                })
+                .catch(error => {
+                    console.error('Fehler beim Laden der GPKG-Dateiliste:', error);
+                    const select = document.getElementById('data-file-select');
+                    select.innerHTML = '<option value="">Fehler beim Laden</option>';
+                    select.disabled = true;
+                    selectedDataFile = null;
+                });
+        }
+
+        function selectDataFile(filename) {
+            if (!filename) {
+                return Promise.resolve(false);
+            }
+
+            return fetch('/api/data-select', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    selectedDataFile = data.current_file;
+                    return true;
+                })
+                .catch(error => {
+                    console.error('Fehler beim Umschalten des Datensatzes:', error);
+                    alert('Datensatz konnte nicht geladen werden: ' + error.message);
+                    return false;
                 });
         }
         
@@ -803,7 +911,17 @@
         
         // Lade automatisch den spez. Wärmebedarf-Layer beim Start
         window.addEventListener('load', function() {
-            loadLayer(activeLayerType);
+            loadAvailableDataFiles().then(() => {
+                const initialFile = document.getElementById('data-file-select').value;
+                if (initialFile) {
+                    selectDataFile(initialFile).then((ok) => {
+                        if (ok) {
+                            loadLayer(activeLayerType);
+                            loadStats();
+                        }
+                    });
+                }
+            });
         });
         
         // Lade Statistiken
@@ -822,9 +940,6 @@
                 .catch(error => console.error('Fehler beim Laden der Statistiken:', error));
         }
         
-        // Initialisiere Statistiken
-        loadStats();
-
         // Sanierungsannahmen
         let sanierungAssumptions = [];
 
@@ -973,6 +1088,7 @@
                     loadLayer(activeLayerType);
                 }
                 loadStats();
+                loadAvailableDataFiles();
                 alert(`Sanierung erfolgreich!\n\nKandidaten: ${data.statistics.candidates}\nAngewandt: ${data.statistics.applied}\nNicht zugeordnet: ${data.statistics.unmatched}`);
             })
             .catch(error => {
@@ -1096,6 +1212,7 @@
                     loadLayer(activeLayerType);
                 }
                 loadStats();
+                loadAvailableDataFiles();
                 alert(
                     `Klima-Simulation erfolgreich!\n\n` +
                     `HDD: ${data.statistics.hdd.toFixed(2)}\n` +
@@ -1123,6 +1240,18 @@
 
         document.getElementById('klima-simulate-btn').addEventListener('click', runKlimaSimulation);
         document.getElementById('klima-scenario').addEventListener('change', populateKlimaYears);
+        document.getElementById('data-file-select').addEventListener('change', function() {
+            const filename = this.value;
+            if (!filename || filename === selectedDataFile) {
+                return;
+            }
+            selectDataFile(filename).then((ok) => {
+                if (ok) {
+                    loadLayer(activeLayerType);
+                    loadStats();
+                }
+            });
+        });
         loadKlimaOptions();
     </script>
 </body>
