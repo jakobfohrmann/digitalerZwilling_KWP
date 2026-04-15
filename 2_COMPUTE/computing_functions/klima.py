@@ -14,7 +14,12 @@ import pandas as pd
 from energie_ref_berechnung import create_energie_instanzen
 from paths import PARAMS_KLIMA_GEB
 from gebaeudetypologie_loader import load_gebaeudetypologie
-from helpers import baujahr_to_baualtersklasse, find_matching_referenz, scale_energie_values, ENERGIE_SPALTEN
+from helpers import (
+    baujahr_to_baualtersklasse,
+    find_matching_referenz_and_gebaeude,
+    scale_energie_values,
+    ENERGIE_SPALTEN,
+)
 
 
 def load_climate_solar_scenarios(csv_path: Optional[str] = None) -> pd.DataFrame:
@@ -146,19 +151,13 @@ def apply_klima_simulation(
         # Konvertiere Baujahr zu Baualtersklasse
         bal = baujahr_to_baualtersklasse(baujahr)
 
-        energie_ref = find_matching_referenz(gebaeudetyp, bal, energie_liste, gebaeude_liste)
+        energie_ref, ref_gebaeude = find_matching_referenz_and_gebaeude(gebaeudetyp, bal, energie_liste, gebaeude_liste)
 
         if energie_ref is None:
             unmatched_count += 1
             continue
 
-        bezugsflaeche_ref = None
-        ref_gebaeude = None
-        for gebaeude in gebaeude_liste:
-            if gebaeude.typ == gebaeudetyp and gebaeude.bal == bal:
-                bezugsflaeche_ref = gebaeude.AN
-                ref_gebaeude = gebaeude
-                break
+        bezugsflaeche_ref = ref_gebaeude.AN if ref_gebaeude is not None else None
 
         if bezugsflaeche_ref is None:
             unmatched_count += 1

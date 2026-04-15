@@ -2,7 +2,7 @@
 Gemeinsame Hilfsfunktionen für Compute/Visualize.
 """
 
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple, Any
 
 import numpy as np
 import pandas as pd
@@ -52,16 +52,41 @@ def baujahr_to_baualtersklasse(baujahr: float) -> Optional[str]:
     return "nach 2009"
 
 
+def get_gebaeudetyp_fallback_chain(gebaeudetyp: str) -> List[str]:
+    """Gibt die Fallback-Kette für einen Gebäudetyp zurück."""
+    if pd.isna(gebaeudetyp):
+        return []
+
+    typ = str(gebaeudetyp).strip().upper()
+    if typ == "HH":
+        return ["HH", "GMH", "MFH"]
+    if typ == "GMH":
+        return ["GMH", "MFH"]
+    return [typ]
+
+
+def find_matching_referenz_and_gebaeude(
+    gebaeudetyp: str,
+    bal: str,
+    energie_liste: list,
+    gebaeude_liste: list,
+) -> Tuple[Optional[Any], Optional[Any]]:
+    """Findet passende Referenz-Energie und das gematchte Referenzgebäude inkl. Typ-Fallback."""
+    if pd.isna(gebaeudetyp) or bal is None:
+        return None, None
+
+    for typ_candidate in get_gebaeudetyp_fallback_chain(gebaeudetyp):
+        for energie, gebaeude in zip(energie_liste, gebaeude_liste):
+            if str(gebaeude.typ).strip().upper() == typ_candidate and gebaeude.bal == bal:
+                return energie, gebaeude
+
+    return None, None
+
+
 def find_matching_referenz(gebaeudetyp: str, bal: str, energie_liste: list, gebaeude_liste: list):
     """Findet passende Referenz-Energiebilanz basierend auf Gebäudetyp und Baualtersklasse."""
-    if pd.isna(gebaeudetyp) or bal is None:
-        return None
-
-    for energie, gebaeude in zip(energie_liste, gebaeude_liste):
-        if gebaeude.typ == gebaeudetyp and gebaeude.bal == bal:
-            return energie
-
-    return None
+    energie, _ = find_matching_referenz_and_gebaeude(gebaeudetyp, bal, energie_liste, gebaeude_liste)
+    return energie
 
 
 def scale_energie_values(

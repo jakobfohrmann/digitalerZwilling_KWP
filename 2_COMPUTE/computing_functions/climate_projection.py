@@ -124,7 +124,7 @@ def _read_iwu_rows(iwu_csv_path: str | Path) -> Tuple[Sequence[str], Dict[str, D
 
 def load_iwu_baseline(
     iwu_csv_path: str | Path = DEFAULT_IWU_PATH,
-    climate_column: str = "Klima.2",
+    climate_column: str = "Klima.1",
 ) -> Dict[str, float]:
     """
     Load baseline climate and solar reference values from IWU CSV.
@@ -471,7 +471,7 @@ def run_solar_projection(
 
 def run_climate_and_solar_projection(
     iwu_csv_path: str | Path = DEFAULT_IWU_PATH,
-    climate_column: str = "Klima.2",
+    climate_column: str = "Klima.1",
     end_year: int = 2100,
     growth_rate_per_decade: float = 0.01,
     hdd_deltas_per_year: Mapping[str, float] = DEFAULT_HDD_DELTAS_PER_YEAR,

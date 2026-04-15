@@ -13,7 +13,12 @@ from typing import Optional, Dict, Set, List, Tuple
 from gebaeudetypologie_loader import Gebaeude
 from energie_ref_berechnung import create_energie_instanzen, create_energie_instanzen_for_gebaeude
 from gebaeudetypologie_loader import load_gebaeudetypologie
-from helpers import ENERGIE_SPALTEN, baujahr_to_baualtersklasse, scale_energie_values
+from helpers import (
+    ENERGIE_SPALTEN,
+    baujahr_to_baualtersklasse,
+    get_gebaeudetyp_fallback_chain,
+    scale_energie_values,
+)
 from paths import COMPUTE_INPUTS, COMPUTE_OUTPUTS, PARAMS_KLIMA_GEB, SIMULATION_ASSUMPTIONS_DIR, VISUALIZE_DIR
 
 
@@ -384,6 +389,14 @@ def apply_sanierung_simulation(
     applied_count = 0
     unmatched_count = 0
 
+    def resolve_typ_with_fallback(input_typ: Optional[str], bal: Optional[str]) -> Optional[str]:
+        if input_typ is None or bal is None:
+            return None
+        for typ_candidate in get_gebaeudetyp_fallback_chain(input_typ):
+            if (typ_candidate, bal) in default_gebaeude_map:
+                return typ_candidate
+        return None
+
     for idx, row in gdf.iterrows():
         gebaeudetyp = row.get('gebaeudetyp')
         if pd.notna(gebaeudetyp):
@@ -406,9 +419,10 @@ def apply_sanierung_simulation(
         gdf.loc[idx, 'sanierung_kandidat'] = bool(is_candidate)
 
         bal = baujahr_to_baualtersklasse(baujahr)
-        energie_default = default_energie_map.get((gebaeudetyp, bal))
-        energie_renov = renovated_energie_map.get((gebaeudetyp, bal))
-        ref_gebaeude = default_gebaeude_map.get((gebaeudetyp, bal))
+        resolved_typ = resolve_typ_with_fallback(gebaeudetyp, bal)
+        energie_default = default_energie_map.get((resolved_typ, bal)) if resolved_typ else None
+        energie_renov = renovated_energie_map.get((resolved_typ, bal)) if resolved_typ else None
+        ref_gebaeude = default_gebaeude_map.get((resolved_typ, bal)) if resolved_typ else None
 
         if energie_default is None or ref_gebaeude is None:
             unmatched_count += 1

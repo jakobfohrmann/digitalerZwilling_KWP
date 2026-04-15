@@ -17,7 +17,12 @@ import numpy as np
 import pandas as pd
 from energie_ref_berechnung import Energie, create_energie_instanzen
 from gebaeudetypologie_loader import load_gebaeudetypologie
-from helpers import baujahr_to_baualtersklasse, find_matching_referenz, scale_energie_values, ENERGIE_SPALTEN
+from helpers import (
+    baujahr_to_baualtersklasse,
+    find_matching_referenz_and_gebaeude,
+    scale_energie_values,
+    ENERGIE_SPALTEN,
+)
 
 
 def add_energiebilanz_to_gebaeude(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
@@ -44,19 +49,15 @@ def add_energiebilanz_to_gebaeude(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         # Konvertiere Baujahr zu Baualtersklasse
         bal = baujahr_to_baualtersklasse(baujahr)
         
-        # Finde passende Referenz
-        energie_ref = find_matching_referenz(gebaeudetyp, bal, energie_liste, gebaeude_liste)
+        # Finde passende Referenz (inkl. Typ-Fallback)
+        energie_ref, ref_gebaeude = find_matching_referenz_and_gebaeude(gebaeudetyp, bal, energie_liste, gebaeude_liste)
         
         if energie_ref is None:
             unmatched_count += 1
             continue
         
-        # Referenzfläche AN aus Typologie
-        bezugsflaeche_ref = None
-        for gebaeude in gebaeude_liste:
-            if gebaeude.typ == gebaeudetyp and gebaeude.bal == bal:
-                bezugsflaeche_ref = gebaeude.AN
-                break
+        # Referenzfläche AN aus gematchter Typologie
+        bezugsflaeche_ref = ref_gebaeude.AN if ref_gebaeude is not None else None
         
         if bezugsflaeche_ref is None:
             unmatched_count += 1
@@ -71,13 +72,7 @@ def add_energiebilanz_to_gebaeude(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         
         if has_sanierung:
             # Berechne c0_QT mit sanierten U-Werten
-            # Finde Referenzgebäude für Flächen und Faktoren
-            ref_gebaeude = None
-            for gebaeude in gebaeude_liste:
-                if gebaeude.typ == gebaeudetyp and gebaeude.bal == bal:
-                    ref_gebaeude = gebaeude
-                    break
-            
+            # Nutzt dasselbe (ggf. gefallbackte) Referenzgebäude wie der Energietreffer
             if ref_gebaeude:
                 # Skaliere Flächen basierend auf Bezugsfläche
                 scale_factor = bezugsflaeche / bezugsflaeche_ref if bezugsflaeche_ref > 0 else 1.0
@@ -151,18 +146,27 @@ def process_gebaeude_with_energiebilanz(input_filename: Optional[str] = None) ->
     Lädt Gebäude aus ETL und fügt Energiebilanzwerte hinzu.
     
     Args:
-        input_filename: Name der Eingabedatei (z.B. 'gebäude_mockau_erweitert.gpkg' oder 'mockau_Charlie_erweitert.gpkg')
-                       Wenn None, wird 'gebäude_mockau_erweitert.gpkg' verwendet.
+        input_filename: Optionaler Name einer Eingabedatei.
+                       Wenn None, wird automatisch die zuletzt geänderte .gpkg-Datei
+                       aus 2_COMPUTE/computing_inputs gewählt.
     """
-    # Konfiguration: Hier einfach den Dateinamen ändern, um zwischen Datenquellen zu wechseln
     if input_filename is None:
-        # ETL-Ausgabe: <Basis>_schritt5.gpkg in 2_COMPUTE/computing_inputs/
-        input_filename = "gebaeude_leipzig_schritt5.gpkg"
-
-    gpkg_path = COMPUTE_INPUTS / input_filename
-    if not gpkg_path.is_file():
-        print(f"Fehler: GeoPackage-Datei nicht gefunden: {gpkg_path}")
-        return None
+        candidates = sorted(
+            COMPUTE_INPUTS.glob("*.gpkg"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True
+        )
+        if not candidates:
+            print(f"Fehler: Keine .gpkg-Datei in {COMPUTE_INPUTS} gefunden")
+            return None
+        gpkg_path = candidates[0]
+        if len(candidates) > 1:
+            print(f"[INFO] Mehrere Eingabe-Dateien gefunden, verwende zuletzt geändert: {gpkg_path.name}")
+    else:
+        gpkg_path = COMPUTE_INPUTS / input_filename
+        if not gpkg_path.is_file():
+            print(f"Fehler: GeoPackage-Datei nicht gefunden: {gpkg_path}")
+            return None
 
     print(f"Lade GeoPackage-Datei: {gpkg_path}")
     try:
@@ -182,8 +186,8 @@ def process_gebaeude_with_energiebilanz(input_filename: Optional[str] = None) ->
     # Füge Energiebilanzwerte hinzu
     gdf = add_energiebilanz_to_gebaeude(gdf)
     
-    # Speichere erweiterte Datei (basierend auf Input-Dateinamen)
-    base_name = os.path.splitext(input_filename)[0]
+    # Speichere erweiterte Datei (basierend auf tatsächlich gewählter Input-Datei)
+    base_name = gpkg_path.stem
     # Entferne "_erweitert" falls vorhanden, füge "_mit_energiebilanz" hinzu
     if base_name.endswith('_erweitert'):
         base_name = base_name[:-10]  # Entferne "_erweitert"
@@ -198,9 +202,9 @@ def process_gebaeude_with_energiebilanz(input_filename: Optional[str] = None) ->
 
 
 if __name__ == "__main__":
-    # Einfach den Dateinamen hier ändern, um zwischen Datenquellen zu wechseln
-    # result = process_gebaeude_with_energiebilanz('gebäude_mockau_erweitert.gpkg')  # Standard-Datei
-    result = process_gebaeude_with_energiebilanz("gebaeude_leipzig_schritt5.gpkg")
+    # Ohne Argument: automatisch letzte .gpkg in computing_inputs verwenden
+    # Mit Argument: process_gebaeude_with_energiebilanz("datei.gpkg")
+    result = process_gebaeude_with_energiebilanz()
     
     if result is not None:
         print(f"\n{'='*80}")

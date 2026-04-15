@@ -29,7 +29,7 @@ from sanierung import (
 from klima import apply_klima_simulation, load_climate_solar_scenarios
 from helpers import (
     baujahr_to_baualtersklasse,
-    find_matching_referenz,
+    find_matching_referenz_and_gebaeude,
     scale_energie_values,
     ENERGIE_SPALTEN,
 )
@@ -188,19 +188,15 @@ def add_energiebilanz_to_gebaeude(gdf: gpd.GeoDataFrame, energy_params: Optional
         # Konvertiere Baujahr zu Baualtersklasse
         bal = baujahr_to_baualtersklasse(baujahr)
 
-        # Finde passende Referenz
-        energie_ref = find_matching_referenz(gebaeudetyp, bal, energie_liste, gebaeude_liste)
+        # Finde passende Referenz (inkl. Typ-Fallback)
+        energie_ref, ref_gebaeude = find_matching_referenz_and_gebaeude(gebaeudetyp, bal, energie_liste, gebaeude_liste)
 
         if energie_ref is None:
             unmatched_count += 1
             continue
 
-        # Referenzfläche AN aus Typologie
-        bezugsflaeche_ref = None
-        for gebaeude in gebaeude_liste:
-            if gebaeude.typ == gebaeudetyp and gebaeude.bal == bal:
-                bezugsflaeche_ref = gebaeude.AN
-                break
+        # Referenzfläche AN aus gematchter Typologie
+        bezugsflaeche_ref = ref_gebaeude.AN if ref_gebaeude is not None else None
 
         if bezugsflaeche_ref is None:
             unmatched_count += 1
