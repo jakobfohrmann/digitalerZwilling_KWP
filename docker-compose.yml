@@ -1,0 +1,21 @@
+name: digitalerZwilling_KWP
+
+services:
+  web:
+    image: ghcr.io/jakobfohrmann/digitaltwin_heating_leipzig:latest
+    pull_policy: always
+    ports:
+      - "5555:8000"
+    restart: unless-stopped
+    container_name: digitalerzwilling_kwp
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./computing_outputs:/app/2_COMPUTE/computing_outputs
+    networks:
+      - web
+
+networks:
+  web:
+    external: true

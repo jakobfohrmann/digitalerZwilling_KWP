@@ -32,3 +32,6 @@ env/
 !1_ETL/output/output_step4/.gitkeep
 1_ETL/output/output_step5/*
 !1_ETL/output/output_step5/.gitkeep
+
+# Evaluierungsskripte lokal halten
+4_Evaluate/

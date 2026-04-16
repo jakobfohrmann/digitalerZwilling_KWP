@@ -92,5 +92,16 @@
         "baujahr_from": 1900,
         "baujahr_to": 1980,
         "custom_parts": []
+    },
+    {
+        "id": "de68897e-af1b-470c-9dd7-0a347d30a53d",
+        "name": "wirklich vollständige Sanierung alle Gebäudetypen",
+        "density": 100.0,
+        "cycle": "2009",
+        "depth": "vollsaniert",
+        "building_types": [],
+        "baujahr_from": 1880,
+        "baujahr_to": 1980,
+        "custom_parts": []
     }
 ]

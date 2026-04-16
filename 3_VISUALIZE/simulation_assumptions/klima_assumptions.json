@@ -52,5 +52,11 @@
         "name": "Klima RCP45 2092",
         "scenario": "rcp45",
         "year": 2092
+    },
+    {
+        "id": "466eef1c-00dd-40bc-995d-60d6ba1d1b95",
+        "name": "Klima RCP85 2045",
+        "scenario": "rcp85",
+        "year": 2045
     }
 ]
