@@ -2,7 +2,7 @@ name: digitalerZwilling_KWP
 
 services:
   web:
-    image: ghcr.io/jakobfohrmann/digitaltwin_heating_leipzig:latest
+    image: ghcr.io/jakobfohrmann/digitalerzwilling_kwp:latest
     pull_policy: always
     ports:
       - "5555:8000"
