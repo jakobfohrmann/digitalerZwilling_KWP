@@ -194,9 +194,15 @@ def load_gebaeudetypologie(csv_path: Optional[str] = None) -> List[Gebaeude]:
     if df is None or len(df.columns) <= 1:
         raise Exception(f"Konnte CSV-Datei nicht einlesen: {csv_path}")
     
-    df_filtered = df.iloc[0:36] if len(df) >= 36 else df.iloc[0:]
-    buildings = [convert_row_to_building(row) for _, row in df_filtered.iterrows()]
-    buildings = [b for b in buildings if b.reference and b.reference.strip() != ""]
-    
-    return buildings
+    all_buildings = []
+    for _, row in df.iterrows():
+        ref = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ""
+        typ = str(row.iloc[1]).strip() if pd.notna(row.iloc[1]) else ""
+        if ref and typ and ref != 'nan' and typ != 'nan':
+            all_buildings.append(convert_row_to_building(row))
+
+    sub_buildings = [b for b in all_buildings if b.reference.startswith('Sub_')]
+    standard_buildings = [b for b in all_buildings if not b.reference.startswith('Sub_')]
+
+    return sub_buildings + standard_buildings
 

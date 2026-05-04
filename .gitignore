@@ -35,3 +35,10 @@ env/
 
 # Evaluierungsskripte lokal halten
 4_Evaluate/
+
+# Claude lokale Arbeitsdaten
+.claude/
+
+# Bachelorarbeit (LaTeX) und Zwischenpräsentation
+BA_Arbeit_Schriftdokument/
+BA_Zwischenpresentation/

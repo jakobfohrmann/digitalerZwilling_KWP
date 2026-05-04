@@ -339,8 +339,12 @@ def apply_sanierung_simulation(
     default_gebaeude = load_gebaeudetypologie()
     default_energie = create_energie_instanzen(energy_params=energy_params)
 
-    default_energie_map = {(g.typ.strip().upper(), g.bal): e for g, e in zip(default_gebaeude, default_energie)}
-    default_gebaeude_map = {(g.typ.strip().upper(), g.bal): g for g in default_gebaeude}
+    default_energie_map = {}
+    default_gebaeude_map = {}
+    for g, e in zip(default_gebaeude, default_energie):
+        key = (g.typ.strip().upper(), g.bal)
+        default_energie_map.setdefault(key, e)
+        default_gebaeude_map.setdefault(key, g)
 
     # Lade Sanierungstypologie und bestimme U-Werte je Gebäudetyp
     csv_path = str(PARAMS_KLIMA_GEB / "gebaeudetypologie.csv")
@@ -367,7 +371,9 @@ def apply_sanierung_simulation(
         renovated_gebaeude,
         energy_params=energy_params
     )
-    renovated_energie_map = {(g.typ.strip().upper(), g.bal): e for g, e in zip(renovated_gebaeude, renovated_energie)}
+    renovated_energie_map = {}
+    for g, e in zip(renovated_gebaeude, renovated_energie):
+        renovated_energie_map.setdefault((g.typ.strip().upper(), g.bal), e)
 
     # Spalten für Simulation
     for col in ENERGIE_SPALTEN:

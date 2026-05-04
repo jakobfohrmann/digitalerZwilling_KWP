@@ -861,12 +861,15 @@
                     .then(response => response.json())
                     .then(colors => {
                         const classes = [
-                            { key: 'sehr_niedrig', label: '< 50 kWh/m²a', desc: 'KfW-Effizienzhaus 40/55' },
-                            { key: 'niedrig', label: '50 - 80 kWh/m²a', desc: 'Gute Energieeffizienz' },
-                            { key: 'mittel', label: '80 - 120 kWh/m²a', desc: 'Durchschnittlich' },
-                            { key: 'mittel_hoch', label: '120 - 150 kWh/m²a', desc: 'Erhöhter Bedarf' },
-                            { key: 'hoch', label: '150 - 200 kWh/m²a', desc: 'Sanierungsbedarf' },
-                            { key: 'sehr_hoch', label: '> 200 kWh/m²a', desc: 'Dringender Sanierungsbedarf' }
+                            { key: 'klasse_a_plus', label: '0 - 30 kWh/m²a', desc: 'Klasse A+' },
+                            { key: 'klasse_a', label: '30,1 - 50 kWh/m²a', desc: 'Klasse A' },
+                            { key: 'klasse_b', label: '50,1 - 75 kWh/m²a', desc: 'Klasse B' },
+                            { key: 'klasse_c', label: '75,1 - 100 kWh/m²a', desc: 'Klasse C' },
+                            { key: 'klasse_d', label: '100,1 - 130 kWh/m²a', desc: 'Klasse D' },
+                            { key: 'klasse_e', label: '130,1 - 160 kWh/m²a', desc: 'Klasse E' },
+                            { key: 'klasse_f', label: '160,1 - 200 kWh/m²a', desc: 'Klasse F' },
+                            { key: 'klasse_g', label: '200,1 - 250 kWh/m²a', desc: 'Klasse G' },
+                            { key: 'klasse_h', label: '> 250 kWh/m²a', desc: 'Klasse H' }
                         ];
                         let spezHTML = legendHTML;
                         classes.forEach(cls => {
@@ -878,12 +881,15 @@
                     .catch(error => {
                         console.error('Fehler beim Laden der Farben:', error);
                         // Fallback: Verwende Standard-Farben
-                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #2ecc71;"></span><span style="color: #2c3e50;">< 50 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">KfW-Effizienzhaus 40/55</span></div>';
-                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #52be80;"></span><span style="color: #2c3e50;">50 - 80 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Gute Energieeffizienz</span></div>';
-                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #f1c40f;"></span><span style="color: #2c3e50;">80 - 120 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Durchschnittlich</span></div>';
-                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #f39c12;"></span><span style="color: #2c3e50;">120 - 150 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Erhöhter Bedarf</span></div>';
-                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #e67e22;"></span><span style="color: #2c3e50;">150 - 200 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Sanierungsbedarf</span></div>';
-                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #e74c3c;"></span><span style="color: #2c3e50;">> 200 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Dringender Sanierungsbedarf</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #1a9850;"></span><span style="color: #2c3e50;">0 - 30 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Klasse A+</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #66bd63;"></span><span style="color: #2c3e50;">30,1 - 50 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Klasse A</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #a6d96a;"></span><span style="color: #2c3e50;">50,1 - 75 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Klasse B</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #d9ef8b;"></span><span style="color: #2c3e50;">75,1 - 100 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Klasse C</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #fee08b;"></span><span style="color: #2c3e50;">100,1 - 130 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Klasse D</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #fdae61;"></span><span style="color: #2c3e50;">130,1 - 160 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Klasse E</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #f46d43;"></span><span style="color: #2c3e50;">160,1 - 200 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Klasse F</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #d73027;"></span><span style="color: #2c3e50;">200,1 - 250 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Klasse G</span></div>';
+                        legendHTML += '<div class="legend-item"><span class="legend-color" style="background: #a50026;"></span><span style="color: #2c3e50;">> 250 kWh/m²a</span><br><span style="font-size: 10px; color: #7f8c8d; margin-left: 28px;">Klasse H</span></div>';
                         legendContainer.innerHTML = legendHTML;
                     });
                 return; // Wird asynchron aktualisiert

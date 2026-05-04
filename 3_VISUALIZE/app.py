@@ -260,18 +260,25 @@ def get_color_for_waermebedarf(value: float, is_spezific: bool = True) -> str:
     
     if is_spezific:
         # Spezifischer Wärmebedarf [kWh/m²a]
-        if value > 200:
-            return '#e74c3c'  # Rot - sehr hoch
-        elif value > 150:
-            return '#e67e22'  # Orange - hoch
-        elif value > 120:
-            return '#f39c12'  # Orange-Gelb
-        elif value > 80:
-            return '#f1c40f'  # Gelb - mittel
+        # Klassierung analog Energieeffizienzklassen A+ bis H (grün -> gelb -> rot)
+        if value > 250:
+            return '#a50026'  # Klasse H
+        elif value > 200:
+            return '#d73027'  # Klasse G
+        elif value > 160:
+            return '#f46d43'  # Klasse F
+        elif value > 130:
+            return '#fdae61'  # Klasse E
+        elif value > 100:
+            return '#fee08b'  # Klasse D
+        elif value > 75:
+            return '#d9ef8b'  # Klasse C
         elif value > 50:
-            return '#52be80'  # Hellgrün - niedrig
+            return '#a6d96a'  # Klasse B
+        elif value > 30:
+            return '#66bd63'  # Klasse A
         else:
-            return '#2ecc71'  # Grün - sehr niedrig
+            return '#1a9850'  # Klasse A+
     else:
         # Absoluter Wärmebedarf [kWh/a] - andere Skalierung
         # Normalisiere auf 1000 kWh/a Schritte
@@ -734,14 +741,17 @@ def get_legend_colors():
             'sehr_hoch': {'min': 200000, 'max': None, 'color': get_color_for_waermebedarf(250000, is_spezific=False)}  # None = unbegrenzt
         }
         
-        # Spezifischer Wärmebedarf-Klassen
+        # Spezifischer Wärmebedarf-Klassen (A+ bis H)
         spez_waermebedarf_classes = {
-            'sehr_niedrig': {'min': 0, 'max': 50, 'color': get_color_for_waermebedarf(25, is_spezific=True)},
-            'niedrig': {'min': 50, 'max': 80, 'color': get_color_for_waermebedarf(65, is_spezific=True)},
-            'mittel': {'min': 80, 'max': 120, 'color': get_color_for_waermebedarf(100, is_spezific=True)},
-            'mittel_hoch': {'min': 120, 'max': 150, 'color': get_color_for_waermebedarf(135, is_spezific=True)},
-            'hoch': {'min': 150, 'max': 200, 'color': get_color_for_waermebedarf(175, is_spezific=True)},
-            'sehr_hoch': {'min': 200, 'max': None, 'color': get_color_for_waermebedarf(250, is_spezific=True)}  # None = unbegrenzt
+            'klasse_a_plus': {'min': 0, 'max': 30, 'color': get_color_for_waermebedarf(15, is_spezific=True)},
+            'klasse_a': {'min': 30, 'max': 50, 'color': get_color_for_waermebedarf(40, is_spezific=True)},
+            'klasse_b': {'min': 50, 'max': 75, 'color': get_color_for_waermebedarf(62.5, is_spezific=True)},
+            'klasse_c': {'min': 75, 'max': 100, 'color': get_color_for_waermebedarf(87.5, is_spezific=True)},
+            'klasse_d': {'min': 100, 'max': 130, 'color': get_color_for_waermebedarf(115, is_spezific=True)},
+            'klasse_e': {'min': 130, 'max': 160, 'color': get_color_for_waermebedarf(145, is_spezific=True)},
+            'klasse_f': {'min': 160, 'max': 200, 'color': get_color_for_waermebedarf(180, is_spezific=True)},
+            'klasse_g': {'min': 200, 'max': 250, 'color': get_color_for_waermebedarf(225, is_spezific=True)},
+            'klasse_h': {'min': 250, 'max': None, 'color': get_color_for_waermebedarf(275, is_spezific=True)}  # None = unbegrenzt
         }
         
         return jsonify({

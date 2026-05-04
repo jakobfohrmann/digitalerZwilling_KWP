@@ -161,7 +161,7 @@ def _load_sanierungszyklen_u_values(csv_path: Optional[str] = None) -> List[Tupl
 
 def _get_sanierungsjahr_for_baujahr(baujahr: int, betrachtungsjahr: int, sanierungszyklus: int = 45) -> int:
     """Berechnet das Sanierungsjahr nach der vorgegebenen 45-Jahres-Formel."""
-    n = int((betrachtungsjahr - baujahr) / sanierungszyklus - 0.5)
+    n = round((betrachtungsjahr - baujahr) / sanierungszyklus - 0.5)
     return baujahr + n * sanierungszyklus
 
 
@@ -169,14 +169,14 @@ def _select_sanierungs_u_values(
     cycle_u_values: List[Tuple[int, Dict[str, float]]],
     sanierungsjahr: int
 ) -> Dict[str, float]:
-    """Wählt U-Werte passend zum Sanierungsjahr (größtes Jahr <= Sanierungsjahr, sonst kleinstes Jahr)."""
+    """Wählt U-Werte passend zum Sanierungsjahr (größtes Jahr <= Sanierungsjahr)."""
     if not cycle_u_values:
         return {}
 
     candidates = [entry for entry in cycle_u_values if entry[0] <= sanierungsjahr]
     if candidates:
         return max(candidates, key=lambda item: item[0])[1]
-    return min(cycle_u_values, key=lambda item: item[0])[1]
+    return {}
 
 
 def _compute_heating_reduction_factors(
