@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 import geopandas as gpd
 import pandas as pd
 
-from helpers import baujahr_to_baualtersklasse
+from shared.helpers import baujahr_to_baualtersklasse
 from services.data_service import get_preferred_sim_value
 
 SPEZ_SCENARIO_COLUMN_MAP = {

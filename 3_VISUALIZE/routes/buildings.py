@@ -13,7 +13,7 @@ from services.color_service import (
     get_spez_scenario_availability, get_color_for_waermebedarf, get_color_for_gebaeudetyp,
     get_color_for_baualtersklasse, SPEZ_SCENARIO_COLUMN_MAP,
 )
-from helpers import baujahr_to_baualtersklasse
+from shared.helpers import baujahr_to_baualtersklasse
 
 import services.data_service as ds
 

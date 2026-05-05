@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 
-from paths import PARAMS_KLIMA_GEB, SIMULATION_ASSUMPTIONS_DIR, VISUALIZE_DIR
+from shared.paths import PARAMS_KLIMA_GEB, SIMULATION_ASSUMPTIONS_DIR, VISUALIZE_DIR
 from sanierung.constants import SANIERUNG_DEPTHS, SANIERUNG_PARTS
 
 _PARAMS_FILE = 'sanierung_assumptions.json'

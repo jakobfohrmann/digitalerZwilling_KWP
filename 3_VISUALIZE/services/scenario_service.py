@@ -5,7 +5,7 @@ import os
 import uuid
 from typing import Dict, List, Optional, Tuple
 
-from paths import SIMULATION_ASSUMPTIONS_DIR, VISUALIZE_DIR
+from shared.paths import SIMULATION_ASSUMPTIONS_DIR, VISUALIZE_DIR
 from climate.loader import load_climate_solar_scenarios
 
 _KLIMA_FILE = 'klima_assumptions.json'

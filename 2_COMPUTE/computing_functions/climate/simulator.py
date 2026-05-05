@@ -9,7 +9,7 @@ import pandas as pd
 from climate.loader import get_climate_values_for_scenario, normalize_scenario_name
 from energy.calculator import create_energie_instanzen
 from typology.loader import load_gebaeudetypologie
-from helpers import baujahr_to_baualtersklasse, find_matching_referenz_and_gebaeude, scale_energie_values, ENERGIE_SPALTEN
+from shared.helpers import baujahr_to_baualtersklasse, find_matching_referenz_and_gebaeude, scale_energie_values, ENERGIE_SPALTEN
 
 
 def apply_klima_simulation(

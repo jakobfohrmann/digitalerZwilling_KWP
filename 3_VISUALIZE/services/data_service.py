@@ -7,10 +7,10 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-from paths import COMPUTE_OUTPUTS
+from shared.paths import COMPUTE_OUTPUTS
 from energy.calculator import create_energie_instanzen, get_default_energy_parameters
 from typology.loader import load_gebaeudetypologie
-from helpers import baujahr_to_baualtersklasse, find_matching_referenz_and_gebaeude, scale_energie_values, ENERGIE_SPALTEN
+from shared.helpers import baujahr_to_baualtersklasse, find_matching_referenz_and_gebaeude, scale_energie_values, ENERGIE_SPALTEN
 
 # --- Globaler Zustand ---
 buildings_data: Optional[gpd.GeoDataFrame] = None

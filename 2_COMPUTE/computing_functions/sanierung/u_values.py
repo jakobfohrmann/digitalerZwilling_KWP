@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Set
 
 import pandas as pd
 
-from paths import PARAMS_KLIMA_GEB
+from shared.paths import PARAMS_KLIMA_GEB
 from sanierung.constants import SANIERUNG_DEPTHS, SANIERUNG_PARTS
 from typology.models import Gebaeude
 

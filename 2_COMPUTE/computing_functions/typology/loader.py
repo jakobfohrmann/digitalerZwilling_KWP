@@ -5,7 +5,7 @@ from typing import List, Optional
 
 import pandas as pd
 
-from paths import PARAMS_KLIMA_GEB
+from shared.paths import PARAMS_KLIMA_GEB
 from typology.models import Gebaeude
 
 

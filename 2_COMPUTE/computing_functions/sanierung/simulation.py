@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 
 from energy.calculator import create_energie_instanzen, create_energie_instanzen_for_gebaeude
-from helpers import ENERGIE_SPALTEN, baujahr_to_baualtersklasse, get_gebaeudetyp_fallback_chain, scale_energie_values
-from paths import PARAMS_KLIMA_GEB
+from shared.helpers import ENERGIE_SPALTEN, baujahr_to_baualtersklasse, get_gebaeudetyp_fallback_chain, scale_energie_values
+from shared.paths import PARAMS_KLIMA_GEB
 from sanierung.assumptions import parse_sanierungszyklus_start
 from sanierung.constants import SANIERUNG_DEPTHS
 from sanierung.u_values import apply_u_values_to_gebaeude, get_sanierung_parts, get_sanierungs_u_values, load_sanierungs_typologie

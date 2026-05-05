@@ -3,7 +3,7 @@
 import csv
 from typing import Dict, List, Optional, Tuple
 
-from paths import PARAMS_KLIMA_GEB
+from shared.paths import PARAMS_KLIMA_GEB
 
 
 def _parse_float(value: str) -> Optional[float]:

@@ -58,5 +58,23 @@
         "name": "Klima RCP85 2045",
         "scenario": "rcp85",
         "year": 2045
+    },
+    {
+        "id": "3b8dc658-96ba-4a06-bf9a-ab40a8515269",
+        "name": "Klima RCP45 2086",
+        "scenario": "rcp45",
+        "year": 2086
+    },
+    {
+        "id": "d06f9655-02a4-4cfe-9116-50021ab4d968",
+        "name": "Klima RCP45 2075",
+        "scenario": "rcp45",
+        "year": 2075
+    },
+    {
+        "id": "4db6a45a-8b35-47f7-90fa-eaef20a758a9",
+        "name": "Klima RCP45 2044",
+        "scenario": "rcp45",
+        "year": 2044
     }
 ]

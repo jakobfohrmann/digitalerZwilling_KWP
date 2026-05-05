@@ -8,7 +8,7 @@ from typing import Optional
 
 import pandas as pd
 
-from paths import PARAMS_KLIMA_GEB
+from shared.paths import PARAMS_KLIMA_GEB
 
 
 @dataclass

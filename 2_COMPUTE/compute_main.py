@@ -8,9 +8,11 @@ from pathlib import Path
 from typing import Dict, Optional
 
 _COMPUTE_DIR = Path(__file__).resolve().parent
+_ROOT = _COMPUTE_DIR.parent
+sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_COMPUTE_DIR / "computing_functions"))
 
-from paths import COMPUTE_INPUTS, COMPUTE_OUTPUTS
+from shared.paths import COMPUTE_INPUTS, COMPUTE_OUTPUTS
 
 import geopandas as gpd
 import numpy as np
@@ -18,7 +20,7 @@ import pandas as pd
 from energy.models import Energie
 from energy.calculator import create_energie_instanzen
 from typology.loader import load_gebaeudetypologie
-from helpers import (
+from shared.helpers import (
     baujahr_to_baualtersklasse,
     find_matching_referenz_and_gebaeude,
     scale_energie_values,

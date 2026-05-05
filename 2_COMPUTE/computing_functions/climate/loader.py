@@ -5,7 +5,7 @@ from typing import Dict, Optional, Tuple
 
 import pandas as pd
 
-from paths import PARAMS_KLIMA_GEB
+from shared.paths import PARAMS_KLIMA_GEB
 
 _REQUIRED_COLUMNS = {'year', 'scenario', 'HDD', 'HD', 'RHDD', 'G_Hor', 'G_Hor_HD', 'G_E_HD', 'G_S_HD', 'G_W_HD', 'G_N_HD'}
 

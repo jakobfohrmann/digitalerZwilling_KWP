@@ -6,7 +6,7 @@ import traceback
 import geopandas as gpd
 from flask import Blueprint, jsonify, request
 
-from paths import COMPUTE_OUTPUTS
+from shared.paths import COMPUTE_OUTPUTS
 from sanierung import (
     load_sanierung_assumptions, save_sanierung_assumptions,
     normalize_sanierung_assumption, apply_sanierung_simulation,

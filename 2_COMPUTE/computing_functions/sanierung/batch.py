@@ -7,7 +7,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-from paths import COMPUTE_INPUTS, COMPUTE_OUTPUTS, PARAMS_KLIMA_GEB
+from shared.paths import COMPUTE_INPUTS, COMPUTE_OUTPUTS, PARAMS_KLIMA_GEB
 from sanierung.u_values import _parse_float, find_matching_typologie_row, load_sanierungs_typologie
 
 

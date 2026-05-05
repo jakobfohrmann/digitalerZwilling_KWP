@@ -2,9 +2,11 @@
 
 import os
 import sys
+from pathlib import Path
 
-# computing_functions/ zum Python-Pfad hinzufügen
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "2_COMPUTE", "computing_functions"))
+_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_ROOT))
+sys.path.insert(0, str(_ROOT / "2_COMPUTE" / "computing_functions"))
 
 from flask import Flask
 
