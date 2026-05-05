@@ -1,0 +1,47 @@
+"""Energiebilanz-Datenstruktur und Standard-Parameter."""
+
+from dataclasses import dataclass
+from typing import Dict
+
+
+DEFAULT_ENERGY_PARAMETERS: Dict[str, float] = {
+    'cp_rho_3600': 0.34,
+    'f_gebaeude_efh_rh': 0.76,
+    'f_gebaeude_sonstige': 0.8,
+    'f_s_verschattung': 0.7,
+    'f_w_strahlung': 0.85,
+    'f_hor': 0.9,
+    'f_orientierung': 0.7,
+    'qi_umrechnung_watt_zu_kwh_tag': 0.024,
+    'qi_flaechenfaktor_ve': 0.32,
+    'phi_wm2': 5.0,
+    'fze_basis': 0.9,
+    'fze_zusatz': 0.1,
+    'fre_h_faktor': 0.5,
+    'nre_basis': 0.25,
+    'nre_faktor_atan': 0.2,
+    'nre_ref_flaeche_efh_rh': 100.0,
+    'nre_ref_flaeche_sonstige': 80.0,
+    'nre_divisor_flaeche': 50.0,
+    'fn_basis': 0.5,
+    'fn_zaehler': 1.0,
+    'fn_h_faktor': 0.5,
+    'qh_umrechnung_watt_zu_kwh_tag': 0.024,
+    'eta_p': 0.95,
+}
+
+
+@dataclass
+class Energie:
+    """Energiebilanz-Werte eines Referenzgebäudes."""
+    a_Referenz: str = ""
+    b_Baualtersklasse: str = ""
+    c_QT: float = 0.0          # Transmissionswärmebedarf unsaniert [W/K]
+    c_QT_saniert: float = 0.0  # Transmissionswärmebedarf saniert [W/K]
+    d_QL: float = 0.0          # Lüftungswärmebedarf [W/K]
+    e_QS: float = 0.0          # Solare Wärmegewinne [kWh/a]
+    f_QI: float = 0.0          # Interne Wärmegewinne [kWh/a]
+    g_QH: float = 0.0          # Heizwärmebedarf unsaniert [kWh/a]
+    g_QH_saniert: float = 0.0  # Heizwärmebedarf saniert [kWh/a]
+    ga_qH: float = 0.0         # Spezifischer HWB unsaniert [kWh/m²a]
+    ga_qH_saniert: float = 0.0 # Spezifischer HWB saniert [kWh/m²a]
