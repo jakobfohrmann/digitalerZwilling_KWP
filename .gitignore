@@ -39,6 +39,9 @@ env/
 # Claude lokale Arbeitsdaten
 .claude/
 
+# Hilfsskripte
+generate_diagram.py
+
 # Bachelorarbeit (LaTeX) und Zwischenpräsentation
 BA_Arbeit_Schriftdokument/
 BA_Zwischenpresentation/
