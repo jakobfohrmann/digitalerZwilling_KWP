@@ -33,15 +33,5 @@ env/
 1_ETL/output/output_step5/*
 !1_ETL/output/output_step5/.gitkeep
 
-# Evaluierungsskripte lokal halten
-4_Evaluate/
-
 # Claude lokale Arbeitsdaten
 .claude/
-
-# Hilfsskripte
-generate_diagram.py
-
-# Bachelorarbeit (LaTeX) und Zwischenpräsentation
-BA_Arbeit_Schriftdokument/
-BA_Zwischenpresentation/
