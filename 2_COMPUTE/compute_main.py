@@ -15,8 +15,9 @@ from paths import COMPUTE_INPUTS, COMPUTE_OUTPUTS
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-from energie_ref_berechnung import Energie, create_energie_instanzen
-from gebaeudetypologie_loader import load_gebaeudetypologie
+from energy.models import Energie
+from energy.calculator import create_energie_instanzen
+from typology.loader import load_gebaeudetypologie
 from helpers import (
     baujahr_to_baualtersklasse,
     find_matching_referenz_and_gebaeude,
