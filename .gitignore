@@ -1,6 +1,6 @@
 # Projektroot (neben requirements.txt) — gilt für das gesamte Repository
 
-# Python: Bytecode-Cache (automatisch von Python angelegt, nicht versionieren)
+# Python
 __pycache__/
 **/__pycache__/
 *.py[cod]
@@ -14,7 +14,10 @@ env/
 *.qgz
 
 # 1_ETL: Lokale Massendaten (Ordnerstruktur bleibt über .gitkeep)
-1_ETL/input/lod1/*.gml
+# LOD1 in allen Unterordnern (lod1_<Gemeinde>/ …), nicht nur direkt unter lod1/
+1_ETL/input/lod1/**/*.gml
+1_ETL/input/lod1/**/*.zip
+1_ETL/input/lod1/**/*.csv
 1_ETL/input/zensus_baualtersklassen/*.csv
 1_ETL/output/*
 !1_ETL/output/.gitkeep
@@ -32,6 +35,3 @@ env/
 !1_ETL/output/output_step4/.gitkeep
 1_ETL/output/output_step5/*
 !1_ETL/output/output_step5/.gitkeep
-
-# Claude lokale Arbeitsdaten
-.claude/

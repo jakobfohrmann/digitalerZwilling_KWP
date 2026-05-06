@@ -22,9 +22,9 @@ def create_app() -> Flask:
     return app
 
 
-if __name__ == '__main__':
-    app = create_app()
+app = create_app()
 
+if __name__ == '__main__':
     print("\n" + "=" * 60)
     print("Web-App gestartet!")
     print("Öffne http://127.0.0.1:5001 im Browser")

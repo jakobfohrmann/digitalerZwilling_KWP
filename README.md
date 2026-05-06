@@ -73,4 +73,4 @@ Danach die App im Browser öffnen: **[http://127.0.0.1:5001](http://127.0.0.1:50
 
 ## Projektstruktur
 
-[Projektstruktur & Datenfluss](projekt_datenfluss.png)
+![Projektstruktur & Datenfluss](projekt_datenfluss.png)

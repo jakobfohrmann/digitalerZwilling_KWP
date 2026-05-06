@@ -84,6 +84,11 @@ def create_energie_instanzen_for_gebaeude(
 
         e.e_QS = (params['f_s_verschattung'] * params['f_w_strahlung'] * g.g_F *
                   (params['f_hor'] * g.A_hor * klima.G_Hor_HD +
+                   params['f_orientierung'] * (g.A_ost + g.A_sued + g.A_west + g.A_nord) *
+                   (klima.G_E_HD + klima.G_S_HD + klima.G_W_HD + klima.G_N_HD) / 4))
+
+        e.e_QS = (params['f_s_verschattung'] * params['f_w_strahlung'] * g.g_F *
+                  (params['f_hor'] * g.A_hor * klima.G_Hor_HD +
                    params['f_orientierung'] * g.A_ost * klima.G_E_HD +
                    params['f_orientierung'] * g.A_sued * klima.G_S_HD +
                    params['f_orientierung'] * g.A_west * klima.G_W_HD +
