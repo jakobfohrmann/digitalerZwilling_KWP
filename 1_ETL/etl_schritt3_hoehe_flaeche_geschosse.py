@@ -287,7 +287,9 @@ def main() -> int:
         else:
             tf = float(trauf)
             if tf > 0:
-                anzahl_g = max(1, int(round(tf / GESCHOSS_HOEHE_ANNAHME_M)))
+                # -1 Korrektur: Traufhöhe schließt Erdgeschoss ein, das im
+                # Heizwärmebedarf-Modell als Keller/Sockel gilt (vgl. Scanergy-Vergleich)
+                anzahl_g = max(1, int(round(tf / GESCHOSS_HOEHE_ANNAHME_M)) - 1)
             else:
                 anzahl_g = 0
         anzahl_geschosse_list.append(float(anzahl_g) if anzahl_g is not None else float("nan"))
